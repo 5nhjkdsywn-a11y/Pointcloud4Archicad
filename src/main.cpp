@@ -256,7 +256,6 @@ static bool WriteGsmViaXml(
 
     // UI-Script
     fprintf(f, "<Script_UI SectVersion=\"20\" SectionFlags=\"0\" SubIdent=\"0\">\n<![CDATA[\n");
-    fprintf(f, "ui_page 1, \"Darstellung\"\n\n");
     fprintf(f,
         "dim\tstUIValues[]\n"
         "\tstUIValues[1]\t= `Einheit und Masstab Einstellungen`\n"
@@ -351,8 +350,13 @@ static bool WriteGsmViaXml(
     fprintf(f, "ui_outfield\t\t\"Quelldatei:\",\txPos1,\tyCurr,\toutFldWdt,\toutFldHgt\n");
     fprintf(f, "ui_outfield\t\tsE57Path,\txPos2,\tyCurr,\t444-xPos2,\toutFldHgt\n\n");
     fprintf(f, "yCurr = yCurr + diffY\n\n");
-    fprintf(f, "ui_page 2, \"Standorte\"\n\n");
-    fprintf(f, "yCurr = yStart\n\n");
+    fprintf(f,
+        "ui_separator\t0,\tyCurr,\t\t444,\tyCurr\n\n"
+        "yCurr = yCurr + 9\n\n"
+        "ui_style 0, 1\n"
+        "ui_outfield\t\t\"Scan-Standorte:\",\txPos1,\tyCurr,\toutFldWdt,\toutFldHgt\n\n"
+        "yCurr = yCurr + diffY\n\n"
+        "ui_style 0, 0\n");
     for (int sc = 0; sc < scanCount; ++sc) {
         char pname[32], label[64];
         snprintf(pname, sizeof(pname), "bScan_%d", sc + 1);
