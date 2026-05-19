@@ -132,7 +132,7 @@ static const char* LP_XMLCONVERTER =
 #endif
 
 static bool WriteGsmViaXml(
-    const char* gspcName,
+    int scanCount,
     const char* baseName,
     const char* outputDirPath,
     float origX, float origY, float origZ,   // Ausdehnung (bboxX/Y/Z)
@@ -188,7 +188,12 @@ static bool WriteGsmViaXml(
         "_scale3DModelY = scaleY * _scaleOriginalSize\n"
         "_scale3DModelZ = scaleZ * _scaleOriginalSize\n\n"
         "mul _scale3DModelX, _scale3DModelY, _scale3DModelZ\n\n");
-    fprintf(f, "POINTCLOUD \"%s\"\n\n\n", gspcName);
+    for (int sc = 0; sc < scanCount; ++sc) {
+        char scanParam[32], scanFile[256];
+        snprintf(scanParam, sizeof(scanParam), "bScan_%d", sc + 1);
+        snprintf(scanFile,  sizeof(scanFile),  "%s_%d.gspc", baseName, sc + 1);
+        fprintf(f, "if %s then\n\tPOINTCLOUD \"%s\"\nendif\n\n", scanParam, scanFile);
+    }
     fprintf(f,
         "del 1\n\n"
         "if bProject2D then\n"
@@ -325,6 +330,23 @@ static bool WriteGsmViaXml(
     fprintf(f, "ui_outfield\t\t\"Quelldatei:\",\txPos1,\tyCurr,\toutFldWdt,\toutFldHgt\n");
     fprintf(f, "ui_outfield\t\tsE57Path,\txPos2,\tyCurr,\t444-xPos2,\toutFldHgt\n\n");
     fprintf(f, "yCurr = yCurr + diffY\n\n");
+    fprintf(f,
+        "ui_separator\t0,\tyCurr,\t\t444,\tyCurr\n\n"
+        "yCurr = yCurr + 9\n\n"
+        "ui_style 0, 1\n"
+        "ui_outfield\t\t\"Scan-Standorte:\",\txPos1,\tyCurr,\toutFldWdt,\toutFldHgt\n\n"
+        "yCurr = yCurr + diffY\n\n"
+        "ui_style 0, 0\n"
+        "for sc = 1 to iScanCount\n"
+        "\tscanLabel = \"Standort \" + str(sc, 1, 0)\n"
+        "\tscanParam = \"bScan_\" + str(sc, 1, 0)\n"
+        "\tui_infield{3} scanParam, xPos1, yCurr-4, 444-xPos1, inFldHgt,\n"
+        "\t\t7, \"\", 1, 1,\n"
+        "\t\t0, 0, 0, 0,\n"
+        "\t\t1, scanLabel, 0,\n"
+        "\t\t1, scanLabel, 1\n"
+        "\tyCurr = yCurr + diffY\n"
+        "endfor\n\n");
     fprintf(f, "]]>\n</Script_UI>\n\n");
 
     // VL-Script
@@ -347,7 +369,8 @@ static bool WriteGsmViaXml(
         "lock \"A\", \"B\", \"ZZYZX\"\n"
         "lock \"iDensityPercent\"\n"
         "lock \"iTotalPoints\"\n"
-        "lock \"iReducedPoints\"\n\n"
+        "lock \"iReducedPoints\"\n"
+        "lock \"iScanCount\"\n\n"
         "values \"lowerPlaneHeight\" range [ ,upperPlaneHeight)\n"
         "values \"upperPlaneHeight\" range [lowerPlaneHeight ,)\n\n"
         "if not(bOverrideCutplane) then\n"
@@ -484,6 +507,15 @@ static bool WriteGsmViaXml(
     fprintf(f, "\t\t<String Name=\"sE57Path\"><Description><![CDATA[\"E57 Quelldatei\"]]></Description>"
                "<Fix/><Flags><ParFlg_Hidden/></Flags>"
                "<Value><![CDATA[\"%s\"]]></Value></String>\n", e57PathStr ? e57PathStr : "");
+    fprintf(f, "\t\t<Integer Name=\"iScanCount\"><Description><![CDATA[\"Anzahl Scan-Standorte\"]]></Description>"
+               "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%d</Value></Integer>\n", scanCount);
+    for (int sc = 0; sc < scanCount; ++sc) {
+        char pname[32], pdesc[64];
+        snprintf(pname, sizeof(pname), "bScan_%d", sc + 1);
+        snprintf(pdesc, sizeof(pdesc), "Standort %d anzeigen", sc + 1);
+        fprintf(f, "\t\t<Boolean Name=\"%s\"><Description><![CDATA[\"%s\"]]></Description>"
+                   "<Fix/><Value>1</Value></Boolean>\n", pname, pdesc);
+    }
 
     fprintf(f, "\t</Parameters>\n</ParamSection>\n\n</Symbol>\n");
     fclose(f);
@@ -696,8 +728,16 @@ struct PointCloudEntry {
     int           densityPercent;
     GS::UniString e57Path;
     GS::UniString outputDir;
-    GS::UniString gspcName;
+    int           scanCount;   // Anzahl Scan-Standorte; 0 = altes Format (_data.gspc)
     Int32         libIndex;
+
+    GS::UniString GspcName(int scanIdx) const
+    {
+        if (scanCount == 0) return name + "_data.gspc";
+        char buf[32];
+        snprintf(buf, sizeof(buf), "_%d.gspc", scanIdx + 1);
+        return name + GS::UniString(buf);
+    }
 };
 
 static GS::Array<PointCloudEntry> CollectOurLibParts()
@@ -717,7 +757,8 @@ static GS::Array<PointCloudEntry> CollectOurLibParts()
         if (ACAPI_LibPart_GetParams(i, &a, &b, &parNum, &pars) != NoError) continue;
 
         GS::UniString e57Path;
-        int density = -1;
+        int density   = -1;
+        int scanCount =  0;
 
         for (Int32 j = 0; j < parNum; ++j) {
             const API_AddParType& p = (*pars)[j];
@@ -729,6 +770,8 @@ static GS::Array<PointCloudEntry> CollectOurLibParts()
             }
             if (strcmp(p.name, "iDensityPercent") == 0)
                 density = (int)(p.value.real + 0.5);
+            if (strcmp(p.name, "iScanCount") == 0)
+                scanCount = (int)(p.value.real + 0.5);
         }
         ACAPI_DisposeAddParHdl(&pars);
 
@@ -747,6 +790,7 @@ static GS::Array<PointCloudEntry> CollectOurLibParts()
         }
         entry.densityPercent = density;
         entry.e57Path        = e57Path;
+        entry.scanCount      = scanCount;
         entry.libIndex       = i;
 
         // Elternverzeichnis plattform-unabhängig (Windows: \, macOS: /)
@@ -757,7 +801,6 @@ static GS::Array<PointCloudEntry> CollectOurLibParts()
         IO::Location outputDirLoc(e57Dir);
         outputDirLoc.AppendToLocal(IO::Name(entry.name));
         outputDirLoc.ToPath(&entry.outputDir);
-        entry.gspcName  = entry.name + GS::UniString("_data.gspc");
         result.Push(entry);
     }
     return result;
@@ -971,16 +1014,11 @@ static GS::UniString DoImport(int densityPct)
     GS::UniString outputDirPath;
     outputDir.ToPath(&outputDirPath);
 
-    GS::UniString gspcName = baseName + "_data.gspc";
-    IO::Location  gspcLoc  = outputDir;
-    gspcLoc.AppendToLocal(IO::Name(gspcName));
-    GS::UniString gspcPath;
-    gspcLoc.ToPath(&gspcPath);
-
-    // E57 → GSPC
+    // E57 → GSPC (pro Scan eine Datei)
     float   bboxX = 1, bboxY = 1, bboxZ = 1;
     float   offX  = 0, offY  = 0, offZ  = 0;
     int64_t totalOrigPoints = 0, totalWritten = 0;
+    int64_t nScans = 0;
     bool    progressOpen = false;
 
     try {
@@ -989,14 +1027,8 @@ static GS::UniString DoImport(int densityPct)
             ACAPI_WriteReport("E57-Datei konnte nicht geöffnet werden.", true);
             return GS::UniString();
         }
-        int64_t nScans = reader.GetData3DCount();
+        nScans = reader.GetData3DCount();
         if (nScans == 0) { ACAPI_WriteReport("E57-Datei enthält keine Scans.", true); return GS::UniString(); }
-
-        GspcWriter gspc;
-        if (!gspc.Open(gspcPath.ToCStr().Get())) {
-            ACAPI_WriteReport("GSPC-Datei konnte nicht angelegt werden.", true);
-            return GS::UniString();
-        }
 
         int64_t totalExpected = 0;
         for (int64_t si2 = 0; si2 < nScans; ++si2) {
@@ -1021,12 +1053,33 @@ static GS::UniString DoImport(int densityPct)
         std::vector<double>   x(CHUNK), y(CHUNK), z(CHUNK);
         std::vector<uint16_t> cr(CHUNK, 200), cg(CHUNK, 200), cb(CHUNK, 200);
         std::vector<int8_t>   colorInvalid(CHUNK, 0);
-        int64_t globalIdx = 0;
-        bool    cancelled = false;
+        bool cancelled = false;
+
+        // Globale Bbox über alle Scans
+        float gxmin =  1e30f, gxmax = -1e30f;
+        float gymin =  1e30f, gymax = -1e30f;
+        float gzmin =  1e30f, gzmax = -1e30f;
 
         for (int64_t si = 0; si < nScans && !cancelled; ++si) {
             e57::Data3D header;
             if (!reader.ReadData3D(si, header)) continue;
+
+            // GSPC-Pfad für diesen Scan
+            char scanSuffix[32];
+            snprintf(scanSuffix, sizeof(scanSuffix), "_%lld.gspc", (long long)(si + 1));
+            GS::UniString scanGspcName = baseName + GS::UniString(scanSuffix);
+            IO::Location  scanGspcLoc  = outputDir;
+            scanGspcLoc.AppendToLocal(IO::Name(scanGspcName));
+            GS::UniString scanGspcPath;
+            scanGspcLoc.ToPath(&scanGspcPath);
+
+            GspcWriter gspc;
+            if (!gspc.Open(scanGspcPath.ToCStr().Get())) {
+                char buf[256]; snprintf(buf, sizeof(buf), "GSPC öffnen fehlgeschlagen: %s", scanGspcPath.ToCStr().Get());
+                Log(buf);
+                continue;
+            }
+
             bool hasColor = header.pointFields.colorRedField
                          && header.pointFields.colorGreenField
                          && header.pointFields.colorBlueField;
@@ -1038,9 +1091,10 @@ static GS::UniString DoImport(int densityPct)
             }
             auto cvr = reader.SetUpData3DPointsData(si, CHUNK, buffers);
             uint64_t nRead;
+            int64_t scanLocalIdx = 0;
             while ((nRead = cvr.read()) > 0) {
                 for (size_t i = 0; i < (size_t)nRead; ++i) {
-                    if (globalIdx % STRIDE == 0) {
+                    if (scanLocalIdx % STRIDE == 0) {
                         double wx, wy, wz;
                         ApplyPose(header.pose, x[i], y[i], z[i], wx, wy, wz);
                         uint8_t r = 200, g = 200, b = 200;
@@ -1057,12 +1111,22 @@ static GS::UniString DoImport(int densityPct)
                             if (Compat_IsProcessCanceled()) { cancelled = true; break; }
                         }
                     }
-                    ++globalIdx;
+                    ++scanLocalIdx;
                 }
             }
             cvr.close();
+            gspc.Close();
+
+            // Globale Bbox aktualisieren
+            if (!gspc.firstPt) {
+                if (gspc.xmin < gxmin) gxmin = gspc.xmin;
+                if (gspc.xmax > gxmax) gxmax = gspc.xmax;
+                if (gspc.ymin < gymin) gymin = gspc.ymin;
+                if (gspc.ymax > gymax) gymax = gspc.ymax;
+                if (gspc.zmin < gzmin) gzmin = gspc.zmin;
+                if (gspc.zmax > gzmax) gzmax = gspc.zmax;
+            }
         }
-        gspc.Close();
         reader.Close();
 
         if (cancelled) {
@@ -1070,10 +1134,13 @@ static GS::UniString DoImport(int densityPct)
             ACAPI_WriteReport("Import abgebrochen.", false);
             return GS::UniString();
         }
-        offX  = gspc.xmin; offY  = gspc.ymin; offZ  = gspc.zmin;
-        bboxX = gspc.xmax - gspc.xmin;
-        bboxY = gspc.ymax - gspc.ymin;
-        bboxZ = gspc.zmax - gspc.zmin;
+
+        if (gxmin <= gxmax) {
+            offX  = gxmin; offY  = gymin; offZ  = gzmin;
+            bboxX = gxmax - gxmin;
+            bboxY = gymax - gymin;
+            bboxZ = gzmax - gzmin;
+        }
 
     } catch (const std::exception& ex) {
         if (progressOpen) Compat_CloseProcessWindow();
@@ -1089,7 +1156,7 @@ static GS::UniString DoImport(int densityPct)
         Compat_SetNextProcessPhase(&phase2, &gsmWork);
 
         bool ok = WriteGsmViaXml(
-            gspcName.ToCStr().Get(), baseName.ToCStr().Get(),
+            (int)nScans, baseName.ToCStr().Get(),
             outputDirPath.ToCStr().Get(),
             bboxX, bboxY, bboxZ,
             offX, offY, offZ,
@@ -1124,10 +1191,6 @@ static bool DoAdjustDensity(const PointCloudEntry& sel, int newDensity)
     Log("--- DoAdjustDensity ---");
     const int STRIDE = std::max(1, 100 / newDensity);
 
-    IO::Location gspcLoc(sel.outputDir);
-    gspcLoc.AppendToLocal(IO::Name(sel.gspcName));
-    GS::UniString gspcPath;
-    gspcLoc.ToPath(&gspcPath);
     int64_t totalWritten = 0;
     bool    progressOpen = false;
 
@@ -1140,12 +1203,7 @@ static bool DoAdjustDensity(const PointCloudEntry& sel, int newDensity)
         int64_t nScans = reader.GetData3DCount();
         if (nScans == 0) { ACAPI_WriteReport("E57-Datei enthält keine Scans.", true); return false; }
 
-        GspcWriter gspc;
         IO::fileSystem.CreateFolder(IO::Location(sel.outputDir));
-        if (!gspc.Open(gspcPath.ToCStr().Get())) {
-            ACAPI_WriteReport("GSPC-Datei konnte nicht angelegt werden.", true);
-            return false;
-        }
 
         int64_t totalExpected = 0;
         for (int64_t si2 = 0; si2 < nScans; ++si2) {
@@ -1168,12 +1226,28 @@ static bool DoAdjustDensity(const PointCloudEntry& sel, int newDensity)
         std::vector<double>   x(CHUNK), y(CHUNK), z(CHUNK);
         std::vector<uint16_t> cr(CHUNK, 200), cg(CHUNK, 200), cb(CHUNK, 200);
         std::vector<int8_t>   colorInvalid(CHUNK, 0);
-        int64_t globalIdx = 0;
-        bool    cancelled = false;
+        bool cancelled = false;
 
         for (int64_t si = 0; si < nScans && !cancelled; ++si) {
             e57::Data3D header;
             if (!reader.ReadData3D(si, header)) continue;
+
+            // GSPC-Pfad für diesen Scan (neues Format: baseName_N.gspc)
+            char scanSuffix[32];
+            snprintf(scanSuffix, sizeof(scanSuffix), "_%lld.gspc", (long long)(si + 1));
+            GS::UniString scanGspcName = sel.name + GS::UniString(scanSuffix);
+            IO::Location  scanGspcLoc(sel.outputDir);
+            scanGspcLoc.AppendToLocal(IO::Name(scanGspcName));
+            GS::UniString scanGspcPath;
+            scanGspcLoc.ToPath(&scanGspcPath);
+
+            GspcWriter gspc;
+            if (!gspc.Open(scanGspcPath.ToCStr().Get())) {
+                char buf[256]; snprintf(buf, sizeof(buf), "GSPC öffnen fehlgeschlagen: %s", scanGspcPath.ToCStr().Get());
+                Log(buf);
+                continue;
+            }
+
             bool hasColor = header.pointFields.colorRedField
                          && header.pointFields.colorGreenField
                          && header.pointFields.colorBlueField;
@@ -1185,9 +1259,10 @@ static bool DoAdjustDensity(const PointCloudEntry& sel, int newDensity)
             }
             auto cvr = reader.SetUpData3DPointsData(si, CHUNK, buffers);
             uint64_t nRead;
+            int64_t scanLocalIdx = 0;
             while ((nRead = cvr.read()) > 0) {
                 for (size_t i = 0; i < (size_t)nRead; ++i) {
-                    if (globalIdx % STRIDE == 0) {
+                    if (scanLocalIdx % STRIDE == 0) {
                         double wx, wy, wz;
                         ApplyPose(header.pose, x[i], y[i], z[i], wx, wy, wz);
                         uint8_t r = 200, g = 200, b = 200;
@@ -1204,12 +1279,12 @@ static bool DoAdjustDensity(const PointCloudEntry& sel, int newDensity)
                             if (Compat_IsProcessCanceled()) { cancelled = true; break; }
                         }
                     }
-                    ++globalIdx;
+                    ++scanLocalIdx;
                 }
             }
             cvr.close();
+            gspc.Close();
         }
-        gspc.Close();
         reader.Close();
 
         if (cancelled) {
@@ -1296,12 +1371,16 @@ static bool TryDeleteEntry(const PointCloudEntry& entry)
     gsmLoc.AppendToLocal(IO::Name(entry.name + ".gsm"));
     GS::UniString gsmPath;
     gsmLoc.ToPath(&gsmPath);
-    IO::Location gspcLoc = dirLoc;
-    gspcLoc.AppendToLocal(IO::Name(entry.gspcName));
-    GS::UniString gspcPath;
-    gspcLoc.ToPath(&gspcPath);
     remove(gsmPath.ToCStr().Get());
-    remove(gspcPath.ToCStr().Get());
+
+    int nToDelete = (entry.scanCount > 0) ? entry.scanCount : 1;
+    for (int sc = 0; sc < nToDelete; ++sc) {
+        IO::Location gspcLoc = dirLoc;
+        gspcLoc.AppendToLocal(IO::Name(entry.GspcName(sc)));
+        GS::UniString gspcPath;
+        gspcLoc.ToPath(&gspcPath);
+        remove(gspcPath.ToCStr().Get());
+    }
     rmdir(entry.outputDir.ToCStr().Get());
 
     // 3. Aus Bibliotheks-Manager entfernen + Reload
