@@ -39,15 +39,25 @@
 #define ID_ADDON_INFO  32000
 #define ID_ADDON_MENU  32500
 
-#ifdef ServerMainVers_2900
-static const char* kVersionStr = "v1.1 \xC2\xB7 AC29";
-#elif defined(ServerMainVers_2800)
-static const char* kVersionStr = "v1.1 \xC2\xB7 AC28";
-#elif defined(ServerMainVers_2700)
-static const char* kVersionStr = "v1.1 \xC2\xB7 AC27";
+#ifdef _WIN32
+#  define PLATFORM_STR "Windows"
+#elif defined(__arm64__) || defined(__aarch64__)
+#  define PLATFORM_STR "macosARM"
 #else
-static const char* kVersionStr = "v1.1 \xC2\xB7 AC26";
+#  define PLATFORM_STR "macosIntel"
 #endif
+
+#ifdef ServerMainVers_2900
+static const char* kVersionStr = "v0.1 \xC2\xB7 AC29 \xC2\xB7 " PLATFORM_STR;
+#elif defined(ServerMainVers_2800)
+static const char* kVersionStr = "v0.1 \xC2\xB7 AC28 \xC2\xB7 " PLATFORM_STR;
+#elif defined(ServerMainVers_2700)
+static const char* kVersionStr = "v0.1 \xC2\xB7 AC27 \xC2\xB7 " PLATFORM_STR;
+#else
+static const char* kVersionStr = "v0.1 \xC2\xB7 AC26 \xC2\xB7 " PLATFORM_STR;
+#endif
+
+#undef PLATFORM_STR
 
 #ifdef _WIN32
 static const char* LOG_PATH = "C:\\ProgramData\\GRAPHISOFT\\punktwolke_addon\\pcd_debug.log";
