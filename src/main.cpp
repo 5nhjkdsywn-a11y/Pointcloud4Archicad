@@ -256,6 +256,7 @@ static bool WriteGsmViaXml(
 
     // UI-Script
     fprintf(f, "<Script_UI SectVersion=\"20\" SectionFlags=\"0\" SubIdent=\"0\">\n<![CDATA[\n");
+    fprintf(f, "ui_page 1, \"Darstellung\"\n\n");
     fprintf(f,
         "dim\tstUIValues[]\n"
         "\tstUIValues[1]\t= `Einheit und Masstab Einstellungen`\n"
@@ -350,23 +351,21 @@ static bool WriteGsmViaXml(
     fprintf(f, "ui_outfield\t\t\"Quelldatei:\",\txPos1,\tyCurr,\toutFldWdt,\toutFldHgt\n");
     fprintf(f, "ui_outfield\t\tsE57Path,\txPos2,\tyCurr,\t444-xPos2,\toutFldHgt\n\n");
     fprintf(f, "yCurr = yCurr + diffY\n\n");
-    fprintf(f,
-        "ui_separator\t0,\tyCurr,\t\t444,\tyCurr\n\n"
-        "yCurr = yCurr + 9\n\n"
-        "ui_style 0, 1\n"
-        "ui_outfield\t\t\"Scan-Standorte:\",\txPos1,\tyCurr,\toutFldWdt,\toutFldHgt\n\n"
-        "yCurr = yCurr + diffY\n\n"
-        "ui_style 0, 0\n"
-        "for sc = 1 to iScanCount\n"
-        "\tscanLabel = \"Standort \" + str(sc, 1, 0)\n"
-        "\tscanParam = \"bScan_\" + str(sc, 1, 0)\n"
-        "\tui_infield{3} scanParam, xPos1, yCurr-4, 444-xPos1, inFldHgt,\n"
-        "\t\t7, \"\", 1, 1,\n"
-        "\t\t0, 0, 0, 0,\n"
-        "\t\t1, scanLabel, 0,\n"
-        "\t\t1, scanLabel, 1\n"
-        "\tyCurr = yCurr + diffY\n"
-        "endfor\n\n");
+    fprintf(f, "ui_page 2, \"Standorte\"\n\n");
+    fprintf(f, "yCurr = yStart\n\n");
+    for (int sc = 0; sc < scanCount; ++sc) {
+        char pname[32], label[64];
+        snprintf(pname, sizeof(pname), "bScan_%d", sc + 1);
+        snprintf(label, sizeof(label), "Standort %d", sc + 1);
+        fprintf(f,
+            "ui_infield{3}\t\"%s\",\txPos1,\tyCurr-4,\t444-xPos1,\tinFldHgt,\n"
+            "\t7, \"\", 1, 1,\n"
+            "\t0, 0, 0, 0,\n"
+            "\t1, \"%s\",\t0,\n"
+            "\t1, \"%s\",\t1\n"
+            "yCurr = yCurr + diffY\n\n",
+            pname, label, label);
+    }
     fprintf(f, "]]>\n</Script_UI>\n\n");
 
     // VL-Script
