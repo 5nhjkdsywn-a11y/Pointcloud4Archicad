@@ -10,6 +10,7 @@
 /* [  7] */ IconButton      5  188   22   22  32402
 /* [  8] */ PosIntEdit     33  188   40   18  LargePlain  "1"  "100"
 /* [  9] */ LeftText       76  192   15   14  LargePlain  "%"
+/* [ 10] */ RightText      95  192  250   14  SmallPlain  "v1.1"
 }
 
 'DLGH' 32400  DLG_32400_PUNKTWOLKEN {
@@ -22,6 +23,7 @@
 7  ""  IconButton_reload
 8  ""  IntEdit_selDens
 9  ""  Label_selDens
+10 ""  Label_version
 }
 
 'STR#' 32000 "Add-on Name and Description" {

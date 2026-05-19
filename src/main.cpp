@@ -39,6 +39,16 @@
 #define ID_ADDON_INFO  32000
 #define ID_ADDON_MENU  32500
 
+#ifdef ServerMainVers_2900
+static const char* kVersionStr = "v1.1 \xC2\xB7 AC29";
+#elif defined(ServerMainVers_2800)
+static const char* kVersionStr = "v1.1 \xC2\xB7 AC28";
+#elif defined(ServerMainVers_2700)
+static const char* kVersionStr = "v1.1 \xC2\xB7 AC27";
+#else
+static const char* kVersionStr = "v1.1 \xC2\xB7 AC26";
+#endif
+
 #ifdef _WIN32
 static const char* LOG_PATH = "C:\\ProgramData\\GRAPHISOFT\\punktwolke_addon\\pcd_debug.log";
 #else
@@ -1431,6 +1441,7 @@ class PunktwolkenPalette
     DG::IconButton       relBtn;
     DG::IntEdit          selDensEdit;
     DG::LeftText         selDensLabel;
+    DG::RightText        versionLabel;
 
     GS::Array<PointCloudEntry> entries;
     int  defaultDensity = 10;
@@ -1465,6 +1476,7 @@ public:
         , relBtn      (GetReference(), kRelBtnId)
         , selDensEdit (GetReference(), kSelDensEditId)
         , selDensLabel(GetReference(), kSelDensLabelId)
+        , versionLabel(GetReference(), 10)
     {
         Log("Palette-Konstruktor: Items initialisiert.");
 
@@ -1476,6 +1488,8 @@ public:
 
         selDensEdit.SetMin(1); selDensEdit.SetMax(100);
         selDensEdit.SetValue(25);
+
+        versionLabel.SetText(GS::UniString(kVersionStr));
 
         SetMinClientSize(100, 150);
 
@@ -1541,6 +1555,7 @@ public:
         relBtn.Move(0, dv);                 // Reload-Icon bleibt am unteren Rand
         selDensEdit.Move(0, dv);
         selDensLabel.Move(0, dv);
+        versionLabel.Move(dh, dv);          // Version bleibt unten rechts
         EndMoveResizeItems();
         listBox.SetTabFieldBeginEndPosition(1, 0, listBox.GetItemWidth());
     }
