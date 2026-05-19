@@ -1,0 +1,215 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "ac26-mac-debug",
+      "displayName": "ArchiCAD 26 · macOS · Debug",
+      "generator": "Xcode",
+      "binaryDir": "${sourceDir}/build/ac26",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-26.7000/API",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "ac26-mac-release",
+      "displayName": "ArchiCAD 26 · macOS · Release",
+      "generator": "Xcode",
+      "binaryDir": "${sourceDir}/build/ac26",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-26.7000/API",
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "ac27-mac-debug",
+      "displayName": "ArchiCAD 27 · macOS · Debug",
+      "generator": "Xcode",
+      "binaryDir": "${sourceDir}/build/ac27",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-27.6003/API",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "ac27-mac-release",
+      "displayName": "ArchiCAD 27 · macOS · Release",
+      "generator": "Xcode",
+      "binaryDir": "${sourceDir}/build/ac27",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-27.6003/API",
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "ac28-mac-debug",
+      "displayName": "ArchiCAD 28 · macOS · Debug",
+      "generator": "Xcode",
+      "binaryDir": "${sourceDir}/build/ac28",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-28.4001/API",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "ac28-mac-release",
+      "displayName": "ArchiCAD 28 · macOS · Release",
+      "generator": "Xcode",
+      "binaryDir": "${sourceDir}/build/ac28",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-28.4001/API",
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "ac29-mac-debug",
+      "displayName": "ArchiCAD 29 · macOS · Debug",
+      "generator": "Xcode",
+      "binaryDir": "${sourceDir}/build/ac29",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-29.3100/API",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "ac29-mac-release",
+      "displayName": "ArchiCAD 29 · macOS · Release",
+      "generator": "Xcode",
+      "binaryDir": "${sourceDir}/build/ac29",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-29.3100/API",
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "ac26-win-debug",
+      "displayName": "ArchiCAD 26 · Windows · Debug",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "toolset": "v142",
+      "binaryDir": "${sourceDir}/build/win-ac26",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../windows/API.Development.Kit.WIN.26.7000",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
+      }
+    },
+    {
+      "name": "ac26-win-release",
+      "displayName": "ArchiCAD 26 · Windows · Release",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "toolset": "v142",
+      "binaryDir": "${sourceDir}/build/win-ac26",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../windows/API.Development.Kit.WIN.26.7000",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
+      }
+    },
+    {
+      "name": "ac27-win-debug",
+      "displayName": "ArchiCAD 27 · Windows · Debug",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "toolset": "v142",
+      "binaryDir": "${sourceDir}/build/win-ac27",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../windows/API.Development.Kit.WIN.27.6003",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
+      }
+    },
+    {
+      "name": "ac27-win-release",
+      "displayName": "ArchiCAD 27 · Windows · Release",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "toolset": "v142",
+      "binaryDir": "${sourceDir}/build/win-ac27",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../windows/API.Development.Kit.WIN.27.6003",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
+      }
+    },
+    {
+      "name": "ac28-win-debug",
+      "displayName": "ArchiCAD 28 · Windows · Debug",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "toolset": "v142",
+      "binaryDir": "${sourceDir}/build/win-ac28",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../windows/API.Development.Kit.WIN.28.4001",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
+      }
+    },
+    {
+      "name": "ac28-win-release",
+      "displayName": "ArchiCAD 28 · Windows · Release",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "toolset": "v142",
+      "binaryDir": "${sourceDir}/build/win-ac28",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../windows/API.Development.Kit.WIN.28.4001",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
+      }
+    },
+    {
+      "name": "ac29-win-debug",
+      "displayName": "ArchiCAD 29 · Windows · Debug",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "toolset": "v143",
+      "binaryDir": "${sourceDir}/build/win-ac29",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../windows/API.Development.Kit.WIN.29.3100",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
+      }
+    },
+    {
+      "name": "ac29-win-release",
+      "displayName": "ArchiCAD 29 · Windows · Release",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "toolset": "v143",
+      "binaryDir": "${sourceDir}/build/win-ac29",
+      "cacheVariables": {
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../windows/API.Development.Kit.WIN.29.3100",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "ac26-mac-debug",   "configurePreset": "ac26-mac-debug",   "configuration": "Debug"   },
+    { "name": "ac26-mac-release", "configurePreset": "ac26-mac-release", "configuration": "Release" },
+    { "name": "ac27-mac-debug",   "configurePreset": "ac27-mac-debug",   "configuration": "Debug"   },
+    { "name": "ac27-mac-release", "configurePreset": "ac27-mac-release", "configuration": "Release" },
+    { "name": "ac28-mac-debug",   "configurePreset": "ac28-mac-debug",   "configuration": "Debug"   },
+    { "name": "ac28-mac-release", "configurePreset": "ac28-mac-release", "configuration": "Release" },
+    { "name": "ac29-mac-debug",   "configurePreset": "ac29-mac-debug",   "configuration": "Debug"   },
+    { "name": "ac29-mac-release", "configurePreset": "ac29-mac-release", "configuration": "Release" },
+    { "name": "ac26-win-debug",   "configurePreset": "ac26-win-debug",   "configuration": "Debug"   },
+    { "name": "ac26-win-release", "configurePreset": "ac26-win-release", "configuration": "Release" },
+    { "name": "ac27-win-debug",   "configurePreset": "ac27-win-debug",   "configuration": "Debug"   },
+    { "name": "ac27-win-release", "configurePreset": "ac27-win-release", "configuration": "Release" },
+    { "name": "ac28-win-debug",   "configurePreset": "ac28-win-debug",   "configuration": "Debug"   },
+    { "name": "ac28-win-release", "configurePreset": "ac28-win-release", "configuration": "Release" },
+    { "name": "ac29-win-debug",   "configurePreset": "ac29-win-debug",   "configuration": "Debug"   },
+    { "name": "ac29-win-release", "configurePreset": "ac29-win-release", "configuration": "Release" }
+  ]
+}

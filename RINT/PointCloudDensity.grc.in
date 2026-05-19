@@ -1,0 +1,40 @@
+/* Localizable strings for PointCloudDensity Add-On */
+
+'GDLG' 32400  Palette | topCaption | close | grow    0    0  354  218  "Punktwolken"  {
+/* [  1] */ LeftText        5    3  320   14  LargePlain  "Punktwolken"
+/* [  2] */ Button          5   20   52   22  LargePlain  "+..."
+/* [  3] */ PosIntEdit     63   20   40   20  LargePlain  "1"  "100"
+/* [  4] */ LeftText      106   24   18   16  LargePlain  "%"
+/* [  5] */ IconButton    328   19   22   22  32401
+/* [  6] */ SingleSelList   5   48  344  132  LargePlain  PartialItems  VScroll  20
+/* [  7] */ IconButton      5  188   22   22  32402
+/* [  8] */ PosIntEdit     33  188   40   18  LargePlain  "1"  "100"
+/* [  9] */ LeftText       76  192   15   14  LargePlain  "%"
+}
+
+'DLGH' 32400  DLG_32400_PUNKTWOLKEN {
+1  ""  Label_header
+2  ""  Button_add
+3  ""  IntEdit_defDens
+4  ""  Label_defDens
+5  ""  IconButton_del
+6  ""  ListBox_clouds
+7  ""  IconButton_reload
+8  ""  IntEdit_selDens
+9  ""  Label_selDens
+}
+
+'STR#' 32000 "Add-on Name and Description" {
+/* [1] */ "@AC_ADDON_NAME@"
+/* [2] */ "E57-Punktwolke importieren und als platzierbares Objekt registrieren"
+}
+
+'STR#' 32500 "Menu Strings" {
+/* [   ] */		"Planung"
+/* [  1] */		"Punktwolken-Palette..."
+}
+
+'STR#' 32600 "Prompt Strings" {
+/* [   ] */		"Planung"
+/* [  1] */		"Punktwolken-Verwaltungspalette öffnen"
+}

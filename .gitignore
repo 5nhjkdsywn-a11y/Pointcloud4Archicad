@@ -1,0 +1,5 @@
+build/
+memory/
+*.gspc
+*.gsm
+*.e57
