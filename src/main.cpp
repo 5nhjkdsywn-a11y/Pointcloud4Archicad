@@ -47,14 +47,18 @@
 #  define PLATFORM_STR "macosIntel"
 #endif
 
+#ifndef PW_VERSION
+#  define PW_VERSION "0.1.x"
+#endif
+
 #ifdef ServerMainVers_2900
-static const char* kVersionStr = "v0.1 \xC2\xB7 AC29 \xC2\xB7 " PLATFORM_STR;
+static const char* kVersionStr = "v" PW_VERSION " \xC2\xB7 AC29 \xC2\xB7 " PLATFORM_STR;
 #elif defined(ServerMainVers_2800)
-static const char* kVersionStr = "v0.1 \xC2\xB7 AC28 \xC2\xB7 " PLATFORM_STR;
+static const char* kVersionStr = "v" PW_VERSION " \xC2\xB7 AC28 \xC2\xB7 " PLATFORM_STR;
 #elif defined(ServerMainVers_2700)
-static const char* kVersionStr = "v0.1 \xC2\xB7 AC27 \xC2\xB7 " PLATFORM_STR;
+static const char* kVersionStr = "v" PW_VERSION " \xC2\xB7 AC27 \xC2\xB7 " PLATFORM_STR;
 #else
-static const char* kVersionStr = "v0.1 \xC2\xB7 AC26 \xC2\xB7 " PLATFORM_STR;
+static const char* kVersionStr = "v" PW_VERSION " \xC2\xB7 AC26 \xC2\xB7 " PLATFORM_STR;
 #endif
 
 #undef PLATFORM_STR
@@ -160,7 +164,10 @@ static bool WriteGsmViaXml(
     int densityPercent,
     const char* e57PathStr,
     int64_t totalPoints,
-    int64_t reducedPoints)
+    int64_t reducedPoints,
+    const double* scanTx,                    // Scanner-Positionen X (Länge scanCount)
+    const double* scanTy,
+    const double* scanTz)
 {
     char guid[37];
     GenGUID(guid);
@@ -207,14 +214,32 @@ static bool WriteGsmViaXml(
         "_scale3DModelX = scaleX * _scaleOriginalSize\n"
         "_scale3DModelY = scaleY * _scaleOriginalSize\n"
         "_scale3DModelZ = scaleZ * _scaleOriginalSize\n\n"
-        "mul _scale3DModelX, _scale3DModelY, _scale3DModelZ\n\n");
+        "mul _scale3DModelX, _scale3DModelY, _scale3DModelZ\n\n"
+        "if bVisible then\n\n");
     for (int sc = 0; sc < scanCount; ++sc) {
         char scanParam[32], scanFile[256];
         snprintf(scanParam, sizeof(scanParam), "bScan_%d", sc + 1);
         snprintf(scanFile,  sizeof(scanFile),  "%s_%d.gspc", baseName, sc + 1);
-        fprintf(f, "if %s then\n\tPOINTCLOUD \"%s\"\nendif\n\n", scanParam, scanFile);
+        fprintf(f, "\tif %s then\n\t\tPOINTCLOUD \"%s\"\n\tendif\n\n", scanParam, scanFile);
+    }
+    if (scanCount > 0) {
+        fprintf(f,
+            "\tif bShowNumbers then\n"
+            "\t\tDEFINE STYLE \"scannum\" \"Arial\", 300, 1, 2\n"
+            "\t\tSET STYLE \"scannum\"\n\n");
+        for (int sc = 0; sc < scanCount; ++sc) {
+            fprintf(f,
+                "\t\tif bScan_%d then\n"
+                "\t\t\tADD xScan_%d, yScan_%d, zScan_%d\n"
+                "\t\t\tTEXT 0.01, 0, \"%d\"\n"
+                "\t\t\tDEL 1\n"
+                "\t\tendif\n\n",
+                sc+1, sc+1, sc+1, sc+1, sc+1);
+        }
+        fprintf(f, "\tendif\n\n");
     }
     fprintf(f,
+        "endif\n\n"
         "del 1\n\n"
         "if bProject2D then\n"
         "\tcutend\n"
@@ -279,7 +304,25 @@ static bool WriteGsmViaXml(
         "outFldHgt\t= 15\n"
         "inFldHgt\t= 19\n"
         "buttonHgt\t= inFldHgt + 2 * diffY\n\n"
+        "ui_dialog `Punktwolke`\n\n"
+        "ui_current_page gs_ui_current_page\n\n"
+        "ui_page 1, -1, `Darstellung`\n\n"
         "yCurr = yStart\n\n"
+        "ui_style 0, 1\n"
+        "ui_infield{3}\t\"bVisible\",\txPos1,\tyCurr-4,\t444-xPos1,\tinFldHgt,\n"
+        "\t7, \"\", 1, 1,\n"
+        "\t0, 0, 0, 0,\n"
+        "\t1, `Punktwolke anzeigen`,\t0,\n"
+        "\t1, `Punktwolke anzeigen`,\t1\n"
+        "yCurr = yCurr + diffY\n\n"
+        "ui_infield{3}\t\"bShowNumbers\",\txPos1,\tyCurr-4,\t444-xPos1,\tinFldHgt,\n"
+        "\t7, \"\", 1, 1,\n"
+        "\t0, 0, 0, 0,\n"
+        "\t1, `Standortnummern anzeigen`,\t0,\n"
+        "\t1, `Standortnummern anzeigen`,\t1\n"
+        "yCurr = yCurr + diffY + 2\n\n"
+        "ui_separator\t0,\tyCurr,\t\t444,\tyCurr\n\n"
+        "yCurr = yCurr + 9\n\n"
         "ui_style 0, 1\n"
         "ui_outfield\t\tstUIValues[1],\txPos1,\tyCurr,\t\t444-xPos1,\toutFldHgt\n\n"
         "yCurr = yCurr + diffY\n\n"
@@ -350,25 +393,20 @@ static bool WriteGsmViaXml(
     fprintf(f, "ui_outfield\t\t\"Quelldatei:\",\txPos1,\tyCurr,\toutFldWdt,\toutFldHgt\n");
     fprintf(f, "ui_outfield\t\tsE57Path,\txPos2,\tyCurr,\t444-xPos2,\toutFldHgt\n\n");
     fprintf(f, "yCurr = yCurr + diffY\n\n");
-    fprintf(f,
-        "ui_separator\t0,\tyCurr,\t\t444,\tyCurr\n\n"
-        "yCurr = yCurr + 9\n\n"
-        "ui_style 0, 1\n"
-        "ui_outfield\t\t\"Scan-Standorte:\",\txPos1,\tyCurr,\toutFldWdt,\toutFldHgt\n\n"
-        "yCurr = yCurr + diffY\n\n"
-        "ui_style 0, 0\n");
-    for (int sc = 0; sc < scanCount; ++sc) {
-        char pname[32], label[64];
-        snprintf(pname, sizeof(pname), "bScan_%d", sc + 1);
-        snprintf(label, sizeof(label), "Standort %d", sc + 1);
+    if (scanCount > 0) {
         fprintf(f,
-            "ui_infield{3}\t\"%s\",\txPos1,\tyCurr-4,\t444-xPos1,\tinFldHgt,\n"
-            "\t7, \"\", 1, 1,\n"
-            "\t0, 0, 0, 0,\n"
-            "\t1, \"%s\",\t0,\n"
-            "\t1, \"%s\",\t1\n"
-            "yCurr = yCurr + diffY\n\n",
-            pname, label, label);
+            "\nui_page 2, -1, `Standorte`\n\n"
+            "yCurr = yStart\n\n"
+            "ui_listfield 1, 5, yCurr, 420, 240, 0, `Standort`, `Sichtbar`\n");
+        for (int sc = 0; sc < scanCount; ++sc) {
+            char pname[32], label[64];
+            snprintf(pname, sizeof(pname), "bScan_%d", sc + 1);
+            snprintf(label, sizeof(label), "Standort %d", sc + 1);
+            fprintf(f,
+                "ui_listitem %d, 1, \"%s\", 0, \"\", `%s`\n",
+                sc + 1, pname, label);
+        }
+        fprintf(f, "\n");
     }
     fprintf(f, "]]>\n</Script_UI>\n\n");
 
@@ -459,7 +497,7 @@ static bool WriteGsmViaXml(
         "<ParamSection SectVersion=\"27\" SectionFlags=\"0\" SubIdent=\"0\">\n"
         "\t<ParamSectHeader>\n"
         "\t\t<AutoHotspots>false</AutoHotspots>\n"
-        "\t\t<StatBits><STBit_UIDefault/><STBit_FixSize/></StatBits>\n"
+        "\t\t<StatBits><STBit_UIDefault/><STBit_FixSize/><STBit_UIUseHierarchicalPages/></StatBits>\n"
         "\t\t<WDLeftFrame>0</WDLeftFrame><WDRightFrame>0</WDRightFrame>\n"
         "\t\t<WDTopFrame>0</WDTopFrame><WDBotFrame>0</WDBotFrame>\n"
         "\t\t<LayFlags>65535</LayFlags>\n"
@@ -521,6 +559,10 @@ static bool WriteGsmViaXml(
                "<Fix/><Flags><ParFlg_Child/></Flags><Value>0</Value></Length>\n");
     fprintf(f, "\t\t<Length Name=\"tempLowerPlaneHeight\"><Description><![CDATA[\"\"]]></Description>"
                "<Fix/><Flags><ParFlg_Child/><ParFlg_Hidden/></Flags><Value>0</Value></Length>\n");
+    fprintf(f, "\t\t<Boolean Name=\"bVisible\"><Description><![CDATA[\"Punktwolke anzeigen\"]]></Description>"
+               "<Fix/><Value>1</Value></Boolean>\n");
+    fprintf(f, "\t\t<Boolean Name=\"bShowNumbers\"><Description><![CDATA[\"Standortnummern anzeigen\"]]></Description>"
+               "<Fix/><Value>%d</Value></Boolean>\n", scanCount > 0 ? 1 : 0);
     fprintf(f, "\t\t<Integer Name=\"iDensityPercent\"><Description><![CDATA[\"Importierte Dichte (%%)\"]]></Description>"
                "<Fix/><Value>%d</Value></Integer>\n", densityPercent);
     fprintf(f, "\t\t<Integer Name=\"iTotalPoints\"><Description><![CDATA[\"Gesamtpunkte\"]]></Description>"
@@ -532,12 +574,29 @@ static bool WriteGsmViaXml(
                "<Value><![CDATA[\"%s\"]]></Value></String>\n", e57PathStr ? e57PathStr : "");
     fprintf(f, "\t\t<Integer Name=\"iScanCount\"><Description><![CDATA[\"Anzahl Scan-Standorte\"]]></Description>"
                "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%d</Value></Integer>\n", scanCount);
+    fprintf(f, "\t\t<Integer Name=\"gs_ui_current_page\"><Description><![CDATA[\"Aktive Seite\"]]></Description>"
+               "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>1</Value></Integer>\n");
     for (int sc = 0; sc < scanCount; ++sc) {
         char pname[32], pdesc[64];
         snprintf(pname, sizeof(pname), "bScan_%d", sc + 1);
         snprintf(pdesc, sizeof(pdesc), "Standort %d anzeigen", sc + 1);
         fprintf(f, "\t\t<Boolean Name=\"%s\"><Description><![CDATA[\"%s\"]]></Description>"
                    "<Fix/><Value>1</Value></Boolean>\n", pname, pdesc);
+    }
+    for (int sc = 0; sc < scanCount; ++sc) {
+        char pnx[32], pny[32], pnz[32];
+        snprintf(pnx, sizeof(pnx), "xScan_%d", sc + 1);
+        snprintf(pny, sizeof(pny), "yScan_%d", sc + 1);
+        snprintf(pnz, sizeof(pnz), "zScan_%d", sc + 1);
+        double tx = scanTx ? scanTx[sc] : 0.0;
+        double ty = scanTy ? scanTy[sc] : 0.0;
+        double tz = scanTz ? scanTz[sc] : 0.0;
+        fprintf(f, "\t\t<RealNum Name=\"%s\"><Description><![CDATA[\"Scanner X %d\"]]></Description>"
+                   "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%.8g</Value></RealNum>\n", pnx, sc+1, tx);
+        fprintf(f, "\t\t<RealNum Name=\"%s\"><Description><![CDATA[\"Scanner Y %d\"]]></Description>"
+                   "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%.8g</Value></RealNum>\n", pny, sc+1, ty);
+        fprintf(f, "\t\t<RealNum Name=\"%s\"><Description><![CDATA[\"Scanner Z %d\"]]></Description>"
+                   "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%.8g</Value></RealNum>\n", pnz, sc+1, tz);
     }
 
     fprintf(f, "\t</Parameters>\n</ParamSection>\n\n</Symbol>\n");
@@ -1043,6 +1102,7 @@ static GS::UniString DoImport(int densityPct)
     int64_t totalOrigPoints = 0, totalWritten = 0;
     int64_t nScans = 0;
     bool    progressOpen = false;
+    std::vector<double> scanTx, scanTy, scanTz;
 
     try {
         e57::Reader reader(std::string(e57Path.ToCStr().Get()), e57::ReaderOptions{});
@@ -1054,23 +1114,21 @@ static GS::UniString DoImport(int densityPct)
         if (nScans == 0) { ACAPI_WriteReport("E57-Datei enthält keine Scans.", true); return GS::UniString(); }
 
         int64_t totalExpected = 0;
+        std::vector<int64_t> scanExpected(nScans, 500000LL);
         for (int64_t si2 = 0; si2 < nScans; ++si2) {
             e57::Data3D hdr2;
             if (reader.ReadData3D(si2, hdr2) && hdr2.pointCount > 0) {
-                totalOrigPoints += hdr2.pointCount;
-                totalExpected   += hdr2.pointCount / STRIDE;
+                totalOrigPoints  += hdr2.pointCount;
+                scanExpected[si2] = std::max<int64_t>(1, hdr2.pointCount / STRIDE);
+                totalExpected    += scanExpected[si2];
             }
         }
         if (totalExpected <= 0) totalExpected = nScans * 500000LL;
 
-        Int32 nPhases = 2;
-        GS::UniString procTitle("E57 importieren...");
+        Int32 nPhases = (Int32)(nScans + 1);
+        GS::UniString procTitle("E57 Import");
         Compat_InitProcessWindow(&procTitle, &nPhases);
         progressOpen = true;
-        Int32 ptTotal    = (Int32)std::min(totalExpected, (int64_t)2000000000LL);
-        Int32 updateStep = (Int32)std::max((int64_t)1, totalExpected / 200);
-        GS::UniString phase1("Punktwolke konvertieren...");
-        Compat_SetNextProcessPhase(&phase1, &ptTotal);
 
         const size_t CHUNK = 65536;
         std::vector<double>   x(CHUNK), y(CHUNK), z(CHUNK);
@@ -1084,8 +1142,23 @@ static GS::UniString DoImport(int densityPct)
         float gzmin =  1e30f, gzmax = -1e30f;
 
         for (int64_t si = 0; si < nScans && !cancelled; ++si) {
+            // Phase pro Scan: "Standort X / N"
+            {
+                Int32 ptScan = (Int32)std::min(scanExpected[si], (int64_t)2000000000LL);
+                char phaseStr[64];
+                snprintf(phaseStr, sizeof(phaseStr), "Standort %lld / %lld", (long long)(si + 1), (long long)nScans);
+                GS::UniString phaseN(phaseStr);
+                Compat_SetNextProcessPhase(&phaseN, &ptScan);
+            }
+            Int32 scanUpdateStep = (Int32)std::max((int64_t)1, scanExpected[si] / 200);
+            int64_t scanWritten = 0;
+
             e57::Data3D header;
             if (!reader.ReadData3D(si, header)) continue;
+
+            scanTx.push_back(header.pose.translation.x);
+            scanTy.push_back(header.pose.translation.y);
+            scanTz.push_back(header.pose.translation.z);
 
             // GSPC-Pfad für diesen Scan
             char scanSuffix[32];
@@ -1128,8 +1201,9 @@ static GS::UniString DoImport(int densityPct)
                         }
                         gspc.Write((float)wx, (float)wy, (float)wz, r, g, b);
                         ++totalWritten;
-                        if (totalWritten % updateStep == 0) {
-                            Int32 prog = (Int32)std::min(totalWritten, (int64_t)ptTotal);
+                        ++scanWritten;
+                        if (scanWritten % scanUpdateStep == 0) {
+                            Int32 prog = (Int32)std::min(scanWritten, scanExpected[si]);
                             Compat_SetProcessValue(&prog);
                             if (Compat_IsProcessCanceled()) { cancelled = true; break; }
                         }
@@ -1184,7 +1258,8 @@ static GS::UniString DoImport(int densityPct)
             bboxX, bboxY, bboxZ,
             offX, offY, offZ,
             densityPct, e57Path.ToCStr().Get(),
-            totalOrigPoints, totalWritten);
+            totalOrigPoints, totalWritten,
+            scanTx.data(), scanTy.data(), scanTz.data());
 
         Int32 done = 1;
         Compat_SetProcessValue(&done);
@@ -1237,12 +1312,12 @@ static bool DoAdjustDensity(const PointCloudEntry& sel, int newDensity)
         if (totalExpected <= 0) totalExpected = nScans * 500000LL;
 
         Int32 nPhases = 1;
-        GS::UniString procTitle("Punktwolke reimportieren...");
+        GS::UniString procTitle("Dichte anpassen");
         Compat_InitProcessWindow(&procTitle, &nPhases);
         progressOpen = true;
         Int32 ptTotal    = (Int32)std::min(totalExpected, (int64_t)2000000000LL);
         Int32 updateStep = (Int32)std::max((int64_t)1, totalExpected / 200);
-        GS::UniString phase1("Punktwolke konvertieren...");
+        GS::UniString phase1("GSPC erzeugen...");
         Compat_SetNextProcessPhase(&phase1, &ptTotal);
 
         const size_t CHUNK = 65536;
