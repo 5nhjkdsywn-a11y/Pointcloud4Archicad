@@ -168,9 +168,7 @@ static bool WriteGsmViaXml(
     const double* scanTx,                    // Scanner-Positionen X (Länge scanCount)
     const double* scanTy,
     const double* scanTz,
-    const double* storyLevels,              // Geschoss-Ebenen (Höhenkoten, aufsteigend sortiert, Länge storyCount)
-    const char**  storyNames,               // Geschossnamen, aufsteigend nach Höhenkote, Länge storyCount
-    int           storyCount)
+    int           storyCount)               // Anzahl Geschosse beim Import (nur für bGroup[]-Initialisierung)
 {
     char guid[37];
     GenGUID(guid);
@@ -275,31 +273,25 @@ static bool WriteGsmViaXml(
         "\tendif\n"
         "endif\n\n");
 
-    // Array-basierte Geschoss-Zuordnung (GDL-Schleifen, kein C++-generierter GDL-Code)
+    // Geschoss-Zuordnung via REQUEST — immer aktuell, kein C++-generierter Story-Code
     if (scanCount > 0) {
         fprintf(f,
             "dim _sg[]\n"
-            "dim _sv[]\n\n");
-        if (storyCount > 0) {
-            fprintf(f,
-                "for _i = 1 to iScanCount\n"
-                "\t_sg[_i] = 0\n"
-                "\tfor _j = 1 to nStories\n"
-                "\t\tif zScan[_i] >= storyLevel[_j] then\n"
-                "\t\t\t_sg[_i] = _j\n"
-                "\t\tendif\n"
-                "\tnext _j\n"
-                "next _i\n\n"
-                "for _i = 1 to iScanCount\n"
-                "\t_sv[_i] = bGroup[_sg[_i] + 1] AND bScan[_i]\n"
-                "next _i\n\n");
-        } else {
-            fprintf(f,
-                "for _i = 1 to iScanCount\n"
-                "\t_sg[_i] = 0\n"
-                "\t_sv[_i] = bScan[_i]\n"
-                "next _i\n\n");
-        }
+            "dim _sv[]\n"
+            "dim _stTab[]\n"
+            "_nSt = 0\n"
+            "REQUEST \"STORY_INFO\", \"\", _nSt, _stTab\n\n"
+            "for _i = 1 to iScanCount\n"
+            "\t_sg[_i] = 0\n"
+            "\tfor _j = 1 to _nSt\n"
+            "\t\tif zScan[_i] >= _stTab[4*(_j-1)+3] then _sg[_i] = _j\n"
+            "\tnext _j\n"
+            "next _i\n\n"
+            "for _i = 1 to iScanCount\n"
+            "\t_bGIdx = _sg[_i] + 1\n"
+            "\tif _bGIdx > VARDIM1 (bGroup) then _bGIdx = VARDIM1 (bGroup)\n"
+            "\t_sv[_i] = bGroup[_bGIdx] AND bScan[_i]\n"
+            "next _i\n\n");
     }
 
     fprintf(f, "]]>\n</Script_1D>\n\n");
@@ -422,40 +414,31 @@ static bool WriteGsmViaXml(
         fprintf(f,
             "\nui_page 2, -1, `Standorte`\n\n"
             "yCurr = yStart\n\n"
-            "ui_listfield 1, 5, yCurr, 420, 240, 0, `Standort`, `Sichtbar`\n\n");
-
-        if (storyCount > 0) {
-            // Geschoss-gruppiert: C++ generiert Einzelzeilen mit Array-Parameternamen als Literale
-            // bGroup[1]=Unter Unterkante, bGroup[2..N+1]=echte Geschosse; _sg[N] mit Literal-Index
-            // ui_listitem{2}: Parameter als echte Referenz (kein String), Array-Zugriff möglich
-            int itemID = 1;
-            for (int si = storyCount - 1; si >= 0; --si) {
-                fprintf(f, "ui_listitem{2} %d, 1, bGroup[%d], 0, \"\", storyName[%d]\n",
-                           itemID++, si + 2, si + 1);
-                for (int sc = 0; sc < scanCount; ++sc) {
-                    int thisID = itemID++;
-                    fprintf(f, "if _sg[%d] = %d then\n"
-                               "\tui_listitem{2} %d, 1, bScan[%d], 1, \"\", `Standort %d`\n"
-                               "endif\n",
-                               sc + 1, si + 1, thisID, sc + 1, sc + 1);
-                }
-            }
-            // Unter Unterkante: bGroup[1]
-            fprintf(f, "ui_listitem{2} %d, 1, bGroup[1], 0, \"\", `Unter Unterkante`\n", itemID++);
-            for (int sc = 0; sc < scanCount; ++sc) {
-                int thisID = itemID++;
-                fprintf(f, "if _sg[%d] = 0 then\n"
-                           "\tui_listitem{2} %d, 1, bScan[%d], 1, \"\", `Standort %d`\n"
-                           "endif\n",
-                           sc + 1, thisID, sc + 1, sc + 1);
-            }
-        } else {
-            // Keine Geschoss-Info: flache Liste
-            for (int sc = 0; sc < scanCount; ++sc)
-                fprintf(f, "ui_listitem{2} %d, 1, bScan[%d], 0, \"\", `Standort %d`\n",
-                           sc + 1, sc + 1, sc + 1);
-        }
-        fprintf(f, "\n");
+            "ui_listfield 1, 5, yCurr, 420, 240, 0, `Standort`, `Sichtbar`\n\n"
+            "_itemID = 1\n\n"
+            "! Geschosse absteigend (oberstes zuerst)\n"
+            "for _j = _nSt to 1 step -1\n"
+            "\t_stNam = _stTab[4*(_j-1)+2]\n"
+            "\t_bGIdx = _j + 1\n"
+            "\tif _bGIdx > VARDIM1 (bGroup) then _bGIdx = VARDIM1 (bGroup)\n"
+            "\tui_listitem{2} _itemID, 1, bGroup[_bGIdx], 0, \"\", _stNam\n"
+            "\t_itemID = _itemID + 1\n"
+            "\tfor _i = 1 to iScanCount\n"
+            "\t\tif _sg[_i] = _j then\n"
+            "\t\t\tui_listitem{2} _itemID, 1, bScan[_i], 1, \"\", `Standort ` + STR(_i, 1, 0)\n"
+            "\t\t\t_itemID = _itemID + 1\n"
+            "\t\tendif\n"
+            "\tnext _i\n"
+            "next _j\n\n"
+            "! Unter Unterkante\n"
+            "ui_listitem{2} _itemID, 1, bGroup[1], 0, \"\", `Unter Unterkante`\n"
+            "_itemID = _itemID + 1\n"
+            "for _i = 1 to iScanCount\n"
+            "\tif _sg[_i] = 0 then\n"
+            "\t\tui_listitem{2} _itemID, 1, bScan[_i], 1, \"\", `Standort ` + STR(_i, 1, 0)\n"
+            "\t\t_itemID = _itemID + 1\n"
+            "\tendif\n"
+            "next _i\n\n");
     }
     fprintf(f, "]]>\n</Script_UI>\n\n");
 
@@ -662,39 +645,15 @@ static bool WriteGsmViaXml(
                    "\t\t</RealNum>\n");
     }
 
-    // Geschoss-Daten (Arrays, hidden) + Gruppen-Booleans
-    if (storyCount > 0) {
-        fprintf(f, "\t\t<Integer Name=\"nStories\"><Description><![CDATA[\"Anzahl Geschosse\"]]></Description>"
-                   "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%d</Value></Integer>\n", storyCount);
-
-        fprintf(f, "\t\t<RealNum Name=\"storyLevel\"><Description><![CDATA[\"Geschoss-Ebenen (m)\"]]></Description>\n"
-                   "\t\t\t<Fix/><Flags><ParFlg_Hidden/></Flags>\n"
-                   "\t\t\t<ArrayValues FirstDimension=\"%d\" SecondDimension=\"0\">\n", storyCount);
-        for (int si = 0; si < storyCount; ++si) {
-            double lv = (storyLevels && storyLevels[si] != 0.0) ? storyLevels[si] : 0.0;
-            fprintf(f, "\t\t\t\t<AVal Row=\"%d\">%.8g</AVal>\n", si + 1, lv);
-        }
-        fprintf(f, "\t\t\t</ArrayValues>\n"
-                   "\t\t</RealNum>\n");
-
-        fprintf(f, "\t\t<String Name=\"storyName\"><Description><![CDATA[\"Geschossnamen\"]]></Description>\n"
-                   "\t\t\t<Fix/><Flags><ParFlg_Hidden/></Flags>\n"
-                   "\t\t\t<ArrayValues FirstDimension=\"%d\" SecondDimension=\"0\">\n", storyCount);
-        for (int si = 0; si < storyCount; ++si) {
-            const char* sn = (storyNames && storyNames[si]) ? storyNames[si] : "";
-            fprintf(f, "\t\t\t\t<AVal Row=\"%d\"><![CDATA[\"%s\"]]></AVal>\n", si + 1, sn);
-        }
-        fprintf(f, "\t\t\t</ArrayValues>\n"
-                   "\t\t</String>\n");
-
-        // bGroup-Array: Index 1 = "Unter Unterkante", Index 2..nStories+1 = echte Geschosse
-        // So gilt einheitlich: _sv[i] = bGroup[_sg[i] + 1] AND bScan[i]
+    // bGroup: Unter Unterkante + je ein Eintrag pro Geschoss beim Import.
+    // GDL liest Geschossinfos per REQUEST live — bGroup bleibt Nutzer-Toggle.
+    if (scanCount > 0) {
+        int bGroupSize = storyCount > 0 ? storyCount + 1 : 1;
         fprintf(f, "\t\t<Boolean Name=\"bGroup\"><Description><![CDATA[\"Gruppe anzeigen\"]]></Description>\n"
                    "\t\t\t<Fix/>\n"
-                   "\t\t\t<ArrayValues FirstDimension=\"%d\" SecondDimension=\"0\">\n", storyCount + 1);
-        fprintf(f, "\t\t\t\t<AVal Row=\"1\">1</AVal>\n");   // Unter Unterkante
-        for (int si = 0; si < storyCount; ++si)
-            fprintf(f, "\t\t\t\t<AVal Row=\"%d\">1</AVal>\n", si + 2);
+                   "\t\t\t<ArrayValues FirstDimension=\"%d\" SecondDimension=\"0\">\n", bGroupSize);
+        for (int i = 1; i <= bGroupSize; ++i)
+            fprintf(f, "\t\t\t\t<AVal Row=\"%d\">1</AVal>\n", i);
         fprintf(f, "\t\t\t</ArrayValues>\n"
                    "\t\t</Boolean>\n");
     }
@@ -1015,174 +974,6 @@ static void ReloadLibraries()
     }
     Compat_SetLibraries(&userLibs);
     Compat_ReloadLibraries();
-}
-
-// ── Geschoss-Synchronisation ─────────────────────────────────────────────────
-
-struct StoryData {
-    double level;
-    char   name[256];
-};
-
-static std::vector<StoryData> GetCurrentStories()
-{
-    std::vector<StoryData> result;
-    API_StoryInfo si = {};
-    if (Compat_GetStorySettings(&si) != NoError || si.data == nullptr)
-        return result;
-    for (short i = si.firstStory; i <= si.lastStory; ++i) {
-        const API_StoryType& s = (*si.data)[i - si.firstStory];
-        StoryData e;
-        e.level = s.level;
-        memset(e.name, 0, sizeof(e.name));
-        for (int k = 0; k < 255 && s.uName[k]; ++k)
-            e.name[k] = (char)(s.uName[k] & 0xFF);
-        result.push_back(e);
-    }
-    BMKillHandle((GSHandle*)&si.data);
-    std::sort(result.begin(), result.end(),
-        [](const StoryData& a, const StoryData& b){ return a.level < b.level; });
-    return result;
-}
-
-// Schreibt nStories / storyLevel[] / storyName[] / bGroup[] im params-Handle neu.
-// Unterstützt auch Größenänderung (mehr oder weniger Geschosse als beim Import).
-static void RebuildStoryParams(API_ElementMemo& memo, const std::vector<StoryData>& newStories)
-{
-    if (memo.params == nullptr) return;
-    int newN = (int)newStories.size();
-
-    GSSize handleSize   = BMGetHandleSize((GSHandle)memo.params);
-    Int32  totalEntries = (Int32)(handleSize / sizeof(API_AddParType));
-
-    std::vector<API_AddParType> src, dst;
-    src.reserve(totalEntries);
-    dst.reserve(totalEntries + 32);
-    for (Int32 j = 0; j < totalEntries; ++j)
-        src.push_back((*memo.params)[j]);
-
-    Int32 j = 0;
-    while (j < (Int32)src.size()) {
-        const char* nm = src[j].name;
-
-        if (strcmp(nm, "nStories") == 0) {
-            API_AddParType e = src[j];
-            e.value.real = (double)newN;
-            dst.push_back(e);
-            j++;
-            continue;
-        }
-
-        if ((src[j].typeMod & API_ParArray) && strcmp(nm, "storyLevel") == 0) {
-            int oldDim = src[j].dim1;
-            API_AddParType hdr = src[j];
-            hdr.dim1 = (short)newN;
-            dst.push_back(hdr);
-            j += 1 + oldDim;
-            for (int i = 0; i < newN; ++i) {
-                API_AddParType val = {};
-                val.typeID     = APIParT_RealNum;
-                val.value.real = newStories[i].level;
-                dst.push_back(val);
-            }
-            continue;
-        }
-
-        if ((src[j].typeMod & API_ParArray) && strcmp(nm, "storyName") == 0) {
-            int oldDim = src[j].dim1;
-            API_AddParType hdr = src[j];
-            hdr.dim1 = (short)newN;
-            dst.push_back(hdr);
-            j += 1 + oldDim;
-            for (int i = 0; i < newN; ++i) {
-                API_AddParType val = {};
-                val.typeID = APIParT_CString;
-                const char* sn = newStories[i].name;
-                for (int c = 0; c < API_UAddParStrLen - 1 && sn[c]; ++c)
-                    val.value.uStr[c] = (GS::UniChar)(unsigned char)sn[c];
-                dst.push_back(val);
-            }
-            continue;
-        }
-
-        // bGroup[1]=Unter Unterkante, bGroup[2..N+1]=Geschosse (absteigend im UI)
-        // Vorhandene Werte (Sichtbarkeit) so weit wie möglich erhalten.
-        if ((src[j].typeMod & API_ParArray) && strcmp(nm, "bGroup") == 0) {
-            int oldDim = src[j].dim1;
-            std::vector<double> oldVals;
-            for (int i = 0; i < oldDim && j+1+i < (Int32)src.size(); ++i)
-                oldVals.push_back(src[j+1+i].value.real);
-            API_AddParType hdr = src[j];
-            hdr.dim1 = (short)(newN + 1);
-            dst.push_back(hdr);
-            j += 1 + oldDim;
-            for (int i = 0; i < newN + 1; ++i) {
-                API_AddParType val = {};
-                val.typeID     = APIParT_Boolean;
-                val.value.real = (i < (int)oldVals.size()) ? oldVals[i] : 1.0;
-                dst.push_back(val);
-            }
-            continue;
-        }
-
-        dst.push_back(src[j]);
-        j++;
-    }
-
-    Int32 newTotal = (Int32)dst.size();
-    if (newTotal != totalEntries) {
-        ACAPI_DisposeAddParHdl(&memo.params);
-        memo.params = reinterpret_cast<API_AddParType**>(
-            BMAllocateHandle(newTotal * sizeof(API_AddParType), ALLOCATE_CLEAR, 0));
-        if (memo.params == nullptr) return;
-    }
-
-    for (Int32 i = 0; i < newTotal; ++i)
-        (*memo.params)[i] = dst[i];
-}
-
-// Aktualisiert Geschoss-Parameter aller platzierten Punktwolken-Objekte.
-// Gibt Anzahl erfolgreich aktualisierter Instanzen zurück.
-static int SyncStoriesInModel(const GS::Array<PointCloudEntry>& entries,
-                              const std::vector<StoryData>&     stories)
-{
-    if (entries.IsEmpty()) return 0;
-
-    GS::Array<API_Guid> elemList;
-    ACAPI_Element_GetElemList(API_ObjectID, &elemList);
-
-    GS::Array<API_Guid> toUpdate;
-    for (const auto& guid : elemList) {
-        API_Element elem = {};
-        elem.header.guid = guid;
-        if (ACAPI_Element_Get(&elem) != NoError) continue;
-        for (UInt32 k = 0; k < entries.GetSize(); ++k) {
-            if (elem.object.libInd == entries[k].libIndex) {
-                toUpdate.Push(guid);
-                break;
-            }
-        }
-    }
-
-    if (toUpdate.IsEmpty()) return 0;
-
-    int updCount = 0;
-    ACAPI_CallUndoableCommand("Geschosse synchronisieren",
-        [&]() -> GSErrCode {
-            for (auto guid : toUpdate) {   // by value: ACAPI_Element_ChangeMemo braucht API_Guid&
-                API_ElementMemo memo = {};
-                if (ACAPI_Element_GetMemo(guid, &memo, APIMemoMask_AddPars) != NoError) {
-                    ACAPI_DisposeElemMemoHdls(&memo);
-                    continue;
-                }
-                RebuildStoryParams(memo, stories);
-                if (ACAPI_Element_ChangeMemo(guid, APIMemoMask_AddPars, &memo) == NoError)
-                    ++updCount;
-                ACAPI_DisposeElemMemoHdls(&memo);
-            }
-            return NoError;
-        });
-    return updCount;
 }
 
 // Parameter in platzierten Instanzen aktualisieren (VOR ReloadLibraries aufrufen!)
@@ -1509,14 +1300,6 @@ static GS::UniString DoImport(int densityPct)
         GS::UniString phase2("GSM erstellen...");
         Compat_SetNextProcessPhase(&phase2, &gsmWork);
 
-        // Story-Arrays für WriteGsmViaXml
-        std::vector<double>      storyLevelVals;
-        std::vector<const char*> storyNamePtrs;
-        for (const auto& s : stories) {
-            storyLevelVals.push_back(s.level);
-            storyNamePtrs.push_back(s.name);
-        }
-
         bool ok = WriteGsmViaXml(
             (int)nScans, baseName.ToCStr().Get(),
             outputDirPath.ToCStr().Get(),
@@ -1525,8 +1308,6 @@ static GS::UniString DoImport(int densityPct)
             densityPct, e57Path.ToCStr().Get(),
             totalOrigPoints, totalWritten,
             scanTx.data(), scanTy.data(), scanTz.data(),
-            storyLevelVals.empty() ? nullptr : storyLevelVals.data(),
-            storyNamePtrs.empty()  ? nullptr : storyNamePtrs.data(),
             (int)stories.size());
 
         Int32 done = 1;
@@ -1778,8 +1559,7 @@ enum PalItemId {
     kListBoxId      = 6,
     kRelBtnId       = 7,
     kSelDensEditId  = 8,
-    kSelDensLabelId = 9,
-    kSyncBtnId      = 11
+    kSelDensLabelId = 9
 };
 
 class PunktwolkenPalette
@@ -1799,7 +1579,6 @@ class PunktwolkenPalette
     DG::IntEdit          selDensEdit;
     DG::LeftText         selDensLabel;
     DG::RightText        versionLabel;
-    DG::Button           syncBtn;
 
     GS::Array<PointCloudEntry> entries;
     int  defaultDensity = 10;
@@ -1835,7 +1614,6 @@ public:
         , selDensEdit (GetReference(), kSelDensEditId)
         , selDensLabel(GetReference(), kSelDensLabelId)
         , versionLabel(GetReference(), 10)
-        , syncBtn     (GetReference(), kSyncBtnId)
     {
         Log("Palette-Konstruktor: Items initialisiert.");
 
@@ -1856,7 +1634,6 @@ public:
         addBtn.Attach (*this);
         relBtn.Attach (*this);
         delBtn.Attach (*this);
-        syncBtn.Attach(*this);
         listBox.Attach(*this);
 
         relBtn.Disable();
@@ -1876,7 +1653,6 @@ public:
         addBtn.Detach (*this);
         relBtn.Detach (*this);
         delBtn.Detach (*this);
-        syncBtn.Detach(*this);
     }
 
     // Bibliothek neu einlesen + Liste neu aufbauen
@@ -1917,7 +1693,6 @@ public:
         selDensEdit.Move(0, dv);
         selDensLabel.Move(0, dv);
         versionLabel.Move(dh, dv);          // Version bleibt unten rechts
-        syncBtn.Move(0, dv);
         EndMoveResizeItems();
         listBox.SetTabFieldBeginEndPosition(1, 0, listBox.GetItemWidth());
     }
@@ -1992,15 +1767,6 @@ public:
             return;
         }
 
-        if (src == &syncBtn) {
-            auto stories = GetCurrentStories();
-            int n = SyncStoriesInModel(entries, stories);
-            char buf[128];
-            snprintf(buf, sizeof(buf), "%d Punktwolken-Instanz(en) mit %d Geschoss(en) synchronisiert.",
-                     n, (int)stories.size());
-            ACAPI_WriteReport(buf, false);
-            return;
-        }
     }
 
     // ── Palette-Registrierung ─────────────────────────────────────────────────
