@@ -280,7 +280,7 @@ static bool WriteGsmViaXml(
             "dim _sv[]\n"
             "dim _stTab[]\n"
             "_nSt = 0\n"
-            "REQUEST \"STORY_INFO\", \"\", _nSt, _stTab\n\n"
+            "_reqRes = REQUEST(\"STORY_INFO\", \"\", _nSt, _stTab)\n\n"
             "for _i = 1 to iScanCount\n"
             "\t_sg[_i] = 0\n"
             "\tfor _j = 1 to _nSt\n"
