@@ -99,7 +99,7 @@ else ()
 	     CACHE PATH "ArchiCAD API DevKit directory")
 endif ()
 set (AC_ADDON_LANGUAGE "INT" CACHE STRING "Add-On language code")
-set (PW_VERSION "0.1.2" CACHE STRING "PointCloud Add-On version string")
+set (PW_VERSION "0.1.7" CACHE STRING "PointCloud Add-On version string")
 
 # Detect ArchiCAD version from DevKit headers, append to addon name
 set (ACAPINC "${AC_API_DEVKIT_DIR}/Support/Inc/ACAPinc.h")
