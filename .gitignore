@@ -3,3 +3,5 @@ memory/
 *.gspc
 *.gsm
 *.e57
+
+.DS_Store
