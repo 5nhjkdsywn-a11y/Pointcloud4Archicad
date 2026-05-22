@@ -92,14 +92,14 @@ if (NOT WIN32)
 endif ()
 
 if (WIN32)
-	set (AC_API_DEVKIT_DIR "${CMAKE_CURRENT_LIST_DIR}/../windows/API.Development.Kit.WIN.26.7000"
+	set (AC_API_DEVKIT_DIR "${CMAKE_CURRENT_LIST_DIR}/../../api/archicad/windows/API.Development.Kit.WIN.26.7000"
 	     CACHE PATH "ArchiCAD API DevKit directory")
 else ()
-	set (AC_API_DEVKIT_DIR "${CMAKE_CURRENT_LIST_DIR}/../macos/archicad-api-devkit-26.7000/API"
+	set (AC_API_DEVKIT_DIR "${CMAKE_CURRENT_LIST_DIR}/../../api/archicad/macos/API.Development.Kit.MAC.26.7000"
 	     CACHE PATH "ArchiCAD API DevKit directory")
 endif ()
 set (AC_ADDON_LANGUAGE "INT" CACHE STRING "Add-On language code")
-set (PW_VERSION "0.1.1" CACHE STRING "PointCloud Add-On version string")
+set (PW_VERSION "0.1.2" CACHE STRING "PointCloud Add-On version string")
 
 # Detect ArchiCAD version from DevKit headers, append to addon name
 set (ACAPINC "${AC_API_DEVKIT_DIR}/Support/Inc/ACAPinc.h")
