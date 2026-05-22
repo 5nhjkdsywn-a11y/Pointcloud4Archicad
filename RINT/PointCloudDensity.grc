@@ -27,7 +27,7 @@
 }
 
 'STR#' 32000 "Add-on Name and Description" {
-/* [1] */ "PointCloudDensity_x86_64_26"
+/* [1] */ "PointCloudDensity_x86_64_27"
 /* [2] */ "E57-Punktwolke importieren und als platzierbares Objekt registrieren"
 }
 
