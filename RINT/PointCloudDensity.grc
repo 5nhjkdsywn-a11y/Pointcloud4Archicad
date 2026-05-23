@@ -27,18 +27,16 @@
 }
 
 'STR#' 32000 "Add-on Name and Description" {
-/* [1] */ "PointCloudDensity_x86_64_29"
+/* [1] */ "PointCloudDensity_x86_64_26"
 /* [2] */ "E57-Punktwolke importieren und als platzierbares Objekt registrieren"
 }
 
 'STR#' 32500 "Menu Strings" {
 /* [   ] */		"Planung"
-/* [   ] */		"openTools"
 /* [  1] */		"Punktwolken-Palette..."
 }
 
 'STR#' 32600 "Prompt Strings" {
 /* [   ] */		"Planung"
-/* [   ] */		"openTools"
 /* [  1] */		"Punktwolken-Verwaltungspalette öffnen"
 }

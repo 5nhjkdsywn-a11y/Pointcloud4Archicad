@@ -33,12 +33,10 @@
 
 'STR#' 32500 "Menu Strings" {
 /* [   ] */		"Planung"
-/* [   ] */		"openTools"
 /* [  1] */		"Punktwolken-Palette..."
 }
 
 'STR#' 32600 "Prompt Strings" {
 /* [   ] */		"Planung"
-/* [   ] */		"openTools"
 /* [  1] */		"Punktwolken-Verwaltungspalette öffnen"
 }
