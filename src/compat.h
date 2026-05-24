@@ -31,65 +31,92 @@
 #include "ACAPI_Interface.h"
 
 // ── Library management ────────────────────────────────────────────────────
-inline GSErrCode Compat_GetLibraries(GS::Array<API_LibraryInfo>* libs, Int32* embIdx)
-    { return ACAPI_LibraryManagement_GetLibraries(libs, embIdx); }
-inline GSErrCode Compat_SetLibraries(const GS::Array<API_LibraryInfo>* libs)
-    { return ACAPI_LibraryManagement_SetLibraries(libs); }
-inline GSErrCode Compat_ReloadLibraries()
-    { return ACAPI_ProjectOperation_ReloadLibraries(); }
-inline GSErrCode Compat_GetStorySettings(API_StoryInfo* info)
-    { return ACAPI_ProjectSetting_GetStorySettings(info); }
+inline GSErrCode Compat_GetLibraries (GS::Array<API_LibraryInfo>* libs, Int32* embIdx)
+    { return ACAPI_LibraryManagement_GetLibraries (libs, embIdx); }
+inline GSErrCode Compat_SetLibraries (const GS::Array<API_LibraryInfo>* libs)
+    { return ACAPI_LibraryManagement_SetLibraries (libs); }
+inline GSErrCode Compat_ReloadLibraries ()
+    { return ACAPI_ProjectOperation_ReloadLibraries (); }
+inline GSErrCode Compat_GetStorySettings (API_StoryInfo* info)
+    { return ACAPI_ProjectSetting_GetStorySettings (info); }
 
 // ── LibPart parameters (formerly ACAPI_Goodies) ───────────────────────────
-inline GSErrCode Compat_OpenParameters(API_ParamOwnerType* owner)
-    { return ACAPI_LibraryPart_OpenParameters(owner); }
-inline GSErrCode Compat_GetActParameters(API_GetParamsType* params)
-    { return ACAPI_LibraryPart_GetActParameters(params); }
-inline GSErrCode Compat_CloseParameters()
-    { return ACAPI_LibraryPart_CloseParameters(); }
+inline GSErrCode Compat_OpenParameters (API_ParamOwnerType* owner)
+    { return ACAPI_LibraryPart_OpenParameters (owner); }
+inline GSErrCode Compat_GetActParameters (API_GetParamsType* params)
+    { return ACAPI_LibraryPart_GetActParameters (params); }
+inline GSErrCode Compat_CloseParameters ()
+    { return ACAPI_LibraryPart_CloseParameters (); }
 
 // ── Progress window (formerly ACAPI_Interface / APIIo_*) ──────────────────
-inline GSErrCode Compat_InitProcessWindow(const GS::UniString* title, Int32* nPhase)
-    { return ACAPI_ProcessWindow_InitProcessWindow(title, nPhase); }
-inline GSErrCode Compat_SetNextProcessPhase(const GS::UniString* subtitle, Int32* maxval)
-    { return ACAPI_ProcessWindow_SetNextProcessPhase(subtitle, maxval); }
-inline GSErrCode Compat_SetProcessValue(Int32* val)
-    { return ACAPI_ProcessWindow_SetProcessValue(val); }
-inline GSErrCode Compat_CloseProcessWindow()
-    { return ACAPI_ProcessWindow_CloseProcessWindow(); }
-inline bool Compat_IsProcessCanceled()
-    { return ACAPI_ProcessWindow_IsProcessCanceled() != NoError; }
+inline GSErrCode Compat_InitProcessWindow (const GS::UniString* title, Int32* nPhase)
+    { return ACAPI_ProcessWindow_InitProcessWindow (title, nPhase); }
+inline GSErrCode Compat_SetNextProcessPhase (const GS::UniString* subtitle, Int32* maxval)
+    { return ACAPI_ProcessWindow_SetNextProcessPhase (subtitle, maxval); }
+inline GSErrCode Compat_SetProcessValue (Int32* val)
+    { return ACAPI_ProcessWindow_SetProcessValue (val); }
+inline GSErrCode Compat_CloseProcessWindow ()
+    { return ACAPI_ProcessWindow_CloseProcessWindow (); }
+inline bool Compat_IsProcessCanceled ()
+    { return ACAPI_ProcessWindow_IsProcessCanceled () != NoError; }
 
 #else  // AC26
 
+// ── Neue API-Namen als Inline-Wrapper (wie in OpenToolsForArchicad) ───────
+// Ermöglicht, durchgehend die AC27+-Namen zu verwenden.
+
+inline GSErrCode ACAPI_MenuItem_RegisterMenu (short menuStrResID, short promptStrResID,
+                                              APIMenuCodeID menuPosCode, GSFlags menuFlags)
+    { return ACAPI_Register_Menu (menuStrResID, promptStrResID, menuPosCode, menuFlags); }
+
+inline GSErrCode ACAPI_MenuItem_InstallMenuHandler (short menuStrResID,
+                                                     APIMenuCommandProc* handlerProc)
+    { return ACAPI_Install_MenuHandler (menuStrResID, handlerProc); }
+
+inline GSErrCode ACAPI_ProjectOperation_CatchProjectEvent (GSFlags eventTypes,
+                                                            APIProjectEventHandlerProc* handlerProc)
+    { return ACAPI_Notify_CatchProjectEvent (eventTypes, handlerProc); }
+
+inline GSErrCode ACAPI_MenuItem_GetMenuItemFlags (const API_MenuItemRef* menuItemRef,
+                                                   GSFlags* itemFlags,
+                                                   GS::UniString* /*menuItemText*/ = nullptr)
+    { return ACAPI_Interface (APIIo_GetMenuItemFlagsID,
+                              const_cast<API_MenuItemRef*> (menuItemRef), itemFlags); }
+
+inline GSErrCode ACAPI_MenuItem_SetMenuItemFlags (const API_MenuItemRef* menuItemRef,
+                                                   GSFlags* itemFlags,
+                                                   GS::UniString* /*menuItemText*/ = nullptr)
+    { return ACAPI_Interface (APIIo_SetMenuItemFlagsID,
+                              const_cast<API_MenuItemRef*> (menuItemRef), itemFlags); }
+
 // ── Library management ────────────────────────────────────────────────────
-inline GSErrCode Compat_GetLibraries(GS::Array<API_LibraryInfo>* libs, Int32* embIdx)
-    { return ACAPI_Environment(APIEnv_GetLibrariesID, libs, embIdx); }
-inline GSErrCode Compat_SetLibraries(const GS::Array<API_LibraryInfo>* libs)
-    { return ACAPI_Environment(APIEnv_SetLibrariesID, const_cast<GS::Array<API_LibraryInfo>*>(libs)); }
-inline GSErrCode Compat_ReloadLibraries()
-    { return ACAPI_Automate(APIDo_ReloadLibrariesID, nullptr, nullptr); }
-inline GSErrCode Compat_GetStorySettings(API_StoryInfo* info)
-    { return ACAPI_Environment(APIEnv_GetStorySettingsID, info, nullptr); }
+inline GSErrCode Compat_GetLibraries (GS::Array<API_LibraryInfo>* libs, Int32* embIdx)
+    { return ACAPI_Environment (APIEnv_GetLibrariesID, libs, embIdx); }
+inline GSErrCode Compat_SetLibraries (const GS::Array<API_LibraryInfo>* libs)
+    { return ACAPI_Environment (APIEnv_SetLibrariesID, const_cast<GS::Array<API_LibraryInfo>*> (libs)); }
+inline GSErrCode Compat_ReloadLibraries ()
+    { return ACAPI_Automate (APIDo_ReloadLibrariesID, nullptr, nullptr); }
+inline GSErrCode Compat_GetStorySettings (API_StoryInfo* info)
+    { return ACAPI_Environment (APIEnv_GetStorySettingsID, info, nullptr); }
 
 // ── LibPart parameters ────────────────────────────────────────────────────
-inline GSErrCode Compat_OpenParameters(API_ParamOwnerType* owner)
-    { return ACAPI_Goodies(APIAny_OpenParametersID, owner, nullptr); }
-inline GSErrCode Compat_GetActParameters(API_GetParamsType* params)
-    { return ACAPI_Goodies(APIAny_GetActParametersID, params, nullptr); }
-inline GSErrCode Compat_CloseParameters()
-    { return ACAPI_Goodies(APIAny_CloseParametersID, nullptr, nullptr); }
+inline GSErrCode Compat_OpenParameters (API_ParamOwnerType* owner)
+    { return ACAPI_Goodies (APIAny_OpenParametersID, owner, nullptr); }
+inline GSErrCode Compat_GetActParameters (API_GetParamsType* params)
+    { return ACAPI_Goodies (APIAny_GetActParametersID, params, nullptr); }
+inline GSErrCode Compat_CloseParameters ()
+    { return ACAPI_Goodies (APIAny_CloseParametersID, nullptr, nullptr); }
 
 // ── Progress window ───────────────────────────────────────────────────────
-inline GSErrCode Compat_InitProcessWindow(const GS::UniString* title, Int32* nPhase)
-    { return ACAPI_Interface(APIIo_InitProcessWindowID, const_cast<GS::UniString*>(title), nPhase); }
-inline GSErrCode Compat_SetNextProcessPhase(const GS::UniString* subtitle, Int32* maxval)
-    { return ACAPI_Interface(APIIo_SetNextProcessPhaseID, const_cast<GS::UniString*>(subtitle), maxval); }
-inline GSErrCode Compat_SetProcessValue(Int32* val)
-    { return ACAPI_Interface(APIIo_SetProcessValueID, val, nullptr); }
-inline GSErrCode Compat_CloseProcessWindow()
-    { return ACAPI_Interface(APIIo_CloseProcessWindowID, nullptr, nullptr); }
-inline bool Compat_IsProcessCanceled()
-    { bool stop = false; ACAPI_Interface(APIIo_IsProcessCanceledID, &stop, nullptr); return stop; }
+inline GSErrCode Compat_InitProcessWindow (const GS::UniString* title, Int32* nPhase)
+    { return ACAPI_Interface (APIIo_InitProcessWindowID, const_cast<GS::UniString*> (title), nPhase); }
+inline GSErrCode Compat_SetNextProcessPhase (const GS::UniString* subtitle, Int32* maxval)
+    { return ACAPI_Interface (APIIo_SetNextProcessPhaseID, const_cast<GS::UniString*> (subtitle), maxval); }
+inline GSErrCode Compat_SetProcessValue (Int32* val)
+    { return ACAPI_Interface (APIIo_SetProcessValueID, val, nullptr); }
+inline GSErrCode Compat_CloseProcessWindow ()
+    { return ACAPI_Interface (APIIo_CloseProcessWindowID, nullptr, nullptr); }
+inline bool Compat_IsProcessCanceled ()
+    { bool stop = false; ACAPI_Interface (APIIo_IsProcessCanceledID, &stop, nullptr); return stop; }
 
 #endif
