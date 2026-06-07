@@ -3,6 +3,7 @@
 // *****************************************************************************
 
 #include "PunktwolkenPalette.hpp"
+#include <string>
 
 static const GS::Guid paletteGuid ("{C7D4E5F6-1A2B-3C4D-8E9F-0A1B2C3D4E5F}");
 static const int      PAL_W = 354;
@@ -103,10 +104,14 @@ void PunktwolkenPalette::Refresh ()
 
     listBox.DeleteItem (DG::ListBox::AllItems);
     for (int i = 0; i < (int)entries.GetSize (); ++i) {
-        GS::UniString text = entries[i].name
-            + GS::UniString (" - ")
-            + GS::UniString (std::to_string (entries[i].densityPercent).c_str ())
-            + GS::UniString ("%");
+        GS::UniString text = entries[i].name + GS::UniString (" - ");
+        if (entries[i].resCount > 1) {
+            text += GS::UniString (std::to_string (entries[i].resCount).c_str ())
+                 + GS::UniString (" Auflösungen");
+        } else {
+            text += GS::UniString (std::to_string (entries[i].densityPercent).c_str ())
+                 + GS::UniString ("%");
+        }
         listBox.AppendItem ();
         listBox.SetTabItemText ((short)(i + 1), 1, text);
     }
@@ -122,7 +127,9 @@ void PunktwolkenPalette::UpdateFooter ()
     int   total = (int)entries.GetSize ();
 
     if (sel > 0 && sel <= (short)total) {
-        selDensEdit.SetValue (entries[sel - 1].densityPercent);
+        const PointCloudEntry& e = entries[sel - 1];
+        selDensEdit.SetValue (e.densityPercent);
+        // relBtn = "Auflösung hinzufügen": immer aktiv wenn Objekt ausgewählt
         relBtn.Enable ();
         selDensEdit.Enable ();
         delBtn.Enable ();
@@ -199,17 +206,10 @@ void PunktwolkenPalette::ButtonClicked (const DG::ButtonClickEvent& ev)
     int   idx = (int)sel - 1;
 
     if (src == &relBtn && sel > 0 && idx < (int)entries.GetSize ()) {
-        int  newDens = (int)selDensEdit.GetValue ();
-        bool ok      = DoAdjustDensity (entries[idx], newDens);
-        if (ok) {
-            entries[idx].densityPercent = newDens;
-            GS::UniString text = entries[idx].name
-                + GS::UniString (" - ")
-                + GS::UniString (std::to_string (newDens).c_str ())
-                + GS::UniString ("%");
-            listBox.SetTabItemText (sel, 1, text);
-            UpdateFooter ();
-        }
+        int newDens = (int)selDensEdit.GetValue ();
+        // Neue Auflösung zur bestehenden Punktwolke hinzufügen
+        GS::UniString added = DoImport (newDens, &entries[idx].e57Path);
+        if (!added.IsEmpty ()) Refresh ();
         return;
     }
 

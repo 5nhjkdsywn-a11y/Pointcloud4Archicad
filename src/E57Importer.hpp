@@ -40,25 +40,32 @@ extern const char* kVersionStr; // "v... · AC26 · ..."
 
 void Log (const char* msg);
 
+// --- ResolutionInfo ----------------------------------------------------------
+
+struct ResolutionInfo {
+    int            densityPercent;
+    GS::UniString  dirName;    // z.B. "010"
+    GS::UniString  label;      // z.B. "10 %"
+};
+
 // --- PointCloudEntry ---------------------------------------------------------
 
 struct PointCloudEntry {
     GS::UniString   name;
-    int             densityPercent;
+    int             densityPercent;   // aktive Auflösung (für Palette)
     GS::UniString   e57Path;
     GS::UniString   outputDir;
-    int             scanCount;     // 0 = altes Format (_data.gspc)
+    int             scanCount;        // 0 = altes Format (_data.gspc)
     Int32           libIndex;
-
-    GS::UniString GspcName (int scanIdx) const;
+    int             resCount;         // Anzahl Auflösungen (>1 = Multi-Res)
 };
 
 // --- Öffentliche Operationen -------------------------------------------------
 
 GS::Array<PointCloudEntry>  CollectOurLibParts  ();
 
-GS::UniString               DoImport            (int densityPct);
-bool                        DoAdjustDensity     (const PointCloudEntry& sel, int newDensity);
+GS::UniString               DoImport            (int densityPct,
+                                                  const GS::UniString* forceE57Path = nullptr);
 bool                        TryDeleteEntry      (const PointCloudEntry& entry);
 void                        AutoPlaceEntry      (const PointCloudEntry& entry);
 
