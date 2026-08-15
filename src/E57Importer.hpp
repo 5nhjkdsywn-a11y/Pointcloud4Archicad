@@ -40,24 +40,15 @@ extern const char* kVersionStr; // "v... · AC26 · ..."
 
 void Log (const char* msg);
 
-// --- ResolutionInfo ----------------------------------------------------------
-
-struct ResolutionInfo {
-    int            densityPercent;
-    GS::UniString  dirName;    // z.B. "010"
-    GS::UniString  label;      // z.B. "10 %"
-};
-
 // --- PointCloudEntry ---------------------------------------------------------
 
 struct PointCloudEntry {
-    GS::UniString   name;
-    int             densityPercent;   // aktive Auflösung (für Palette)
-    GS::UniString   e57Path;
-    GS::UniString   outputDir;
-    int             scanCount;        // 0 = altes Format (_data.gspc)
-    Int32           libIndex;
-    int             resCount;         // Anzahl Auflösungen (>1 = Multi-Res)
+    GS::UniString       name;
+    int                 densityPercent;
+    GS::UniString       e57Path;
+    GS::UniString       outputDir;
+    int                 scanCount;        // 0 = altes Format (_data.gspc)
+    Int32               libIndex;
 };
 
 // --- Öffentliche Operationen -------------------------------------------------

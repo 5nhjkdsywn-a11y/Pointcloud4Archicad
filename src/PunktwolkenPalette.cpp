@@ -104,14 +104,11 @@ void PunktwolkenPalette::Refresh ()
 
     listBox.DeleteItem (DG::ListBox::AllItems);
     for (int i = 0; i < (int)entries.GetSize (); ++i) {
-        GS::UniString text = entries[i].name + GS::UniString (" - ");
-        if (entries[i].resCount > 1) {
-            text += GS::UniString (std::to_string (entries[i].resCount).c_str ())
-                 + GS::UniString (" Auflösungen");
-        } else {
-            text += GS::UniString (std::to_string (entries[i].densityPercent).c_str ())
-                 + GS::UniString ("%");
-        }
+        const PointCloudEntry& e = entries[i];
+        GS::UniString text = e.name
+            + GS::UniString (" - ")
+            + GS::UniString (std::to_string (e.densityPercent).c_str ())
+            + GS::UniString ("%");
         listBox.AppendItem ();
         listBox.SetTabItemText ((short)(i + 1), 1, text);
     }
@@ -123,13 +120,10 @@ void PunktwolkenPalette::Refresh ()
 
 void PunktwolkenPalette::UpdateFooter ()
 {
-    short sel   = listBox.GetSelectedItem ();
-    int   total = (int)entries.GetSize ();
+    short sel = listBox.GetSelectedItem ();
 
-    if (sel > 0 && sel <= (short)total) {
-        const PointCloudEntry& e = entries[sel - 1];
-        selDensEdit.SetValue (e.densityPercent);
-        // relBtn = "Auflösung hinzufügen": immer aktiv wenn Objekt ausgewählt
+    if (sel > 0 && sel <= (short)entries.GetSize ()) {
+        selDensEdit.SetValue (entries[(int)sel - 1].densityPercent);
         relBtn.Enable ();
         selDensEdit.Enable ();
         delBtn.Enable ();
@@ -202,12 +196,11 @@ void PunktwolkenPalette::ButtonClicked (const DG::ButtonClickEvent& ev)
         return;
     }
 
-    short sel = listBox.GetSelectedItem ();
-    int   idx = (int)sel - 1;
+    short sel    = listBox.GetSelectedItem ();
+    int   idx    = (int)sel - 1;
 
     if (src == &relBtn && sel > 0 && idx < (int)entries.GetSize ()) {
         int newDens = (int)selDensEdit.GetValue ();
-        // Neue Auflösung zur bestehenden Punktwolke hinzufügen
         GS::UniString added = DoImport (newDens, &entries[idx].e57Path);
         if (!added.IsEmpty ()) Refresh ();
         return;

@@ -122,6 +122,40 @@ static const char PATH_SEP = '\\';
 static const char PATH_SEP = '/';
 #endif
 
+// --- Stabile GUID: beim ersten Import erzeugen, danach aus .guid-Datei lesen --
+// Verhindert, dass ArchiCAD platzierte Objekte als "fehlend" markiert, wenn
+// das GSM bei einem Reload neu erzeugt wird.
+
+static void GetOrCreateGuid (const char* outputDirPath,
+                               const char* baseName,
+                               char        out[37])
+{
+    char guidPath[1024];
+    snprintf (guidPath, sizeof (guidPath), "%s%c%s.guid",
+              outputDirPath, PATH_SEP, baseName);
+
+    // Bereits vorhandene GUID lesen
+    FILE* f = fopen (guidPath, "r");
+    if (f) {
+        char buf[40] = {};
+        size_t n = fread (buf, 1, 36, f);
+        fclose (f);
+        if (n == 36) {
+            memcpy (out, buf, 36);
+            out[36] = '\0';
+            return;
+        }
+    }
+
+    // Neue GUID erzeugen und speichern
+    GenGUID (out);
+    f = fopen (guidPath, "w");
+    if (f) {
+        fwrite (out, 1, 36, f);
+        fclose (f);
+    }
+}
+
 // --- LP_XMLConverter-Pfad ----------------------------------------------------
 
 #ifdef _WIN32
@@ -158,57 +192,87 @@ static const char* LP_XMLCONVERTER =
 #  endif
 #endif
 
-// --- Hilfsfunktionen für Auflösungs-Verwaltung --------------------------------
+// --- PwMeta: Sidecar-Datei mit Import-Parametern (.pwmeta) -------------------
+// Beim ersten Import geschrieben, beim Reload gelesen.
+// Erlaubt GSM-Neugenerierung ohne erneutes E57-Parsing wenn GSPC schon vorhanden.
 
-static void MakeResInfo (int densityPct, ResolutionInfo& out)
+struct PwMeta {
+    float    origX, origY, origZ;   // Bounding-Box-Ausmaße (Meter)
+    float    offX,  offY,  offZ;    // Koordinaten-Offset (Weltkoordinaten)
+    int32_t  scanCount;
+    int64_t  totalPoints;
+    int32_t  storyCount;
+    // Danach im Stream:
+    //   scanCount * double  scanTx
+    //   scanCount * double  scanTy
+    //   scanCount * double  scanTz
+    //   int32_t e57PathLen + char e57Path[]
+};
+
+static void WritePwMeta (const char* outputDirPath, const char* baseName,
+                          const PwMeta& m,
+                          const std::vector<double>& tx,
+                          const std::vector<double>& ty,
+                          const std::vector<double>& tz,
+                          const char* e57Path)
+{
+    char path[1024];
+    snprintf (path, sizeof (path), "%s%c%s.pwmeta", outputDirPath, PATH_SEP, baseName);
+    FILE* f = fopen (path, "wb");
+    if (!f) return;
+    const char magic[4] = {'P', 'W', 'M', 'F'};
+    uint32_t ver = 1;
+    fwrite (magic, 1, 4, f);
+    fwrite (&ver,  4, 1, f);
+    fwrite (&m,    sizeof (PwMeta), 1, f);
+    fwrite (tx.data (), sizeof (double), (size_t)m.scanCount, f);
+    fwrite (ty.data (), sizeof (double), (size_t)m.scanCount, f);
+    fwrite (tz.data (), sizeof (double), (size_t)m.scanCount, f);
+    int32_t plen = (int32_t)strlen (e57Path);
+    fwrite (&plen,  4, 1, f);
+    fwrite (e57Path, 1, (size_t)plen, f);
+    fclose (f);
+}
+
+static bool ReadPwMeta (const char* outputDirPath, const char* baseName,
+                         PwMeta& m,
+                         std::vector<double>& tx,
+                         std::vector<double>& ty,
+                         std::vector<double>& tz,
+                         std::string& e57Path)
+{
+    char path[1024];
+    snprintf (path, sizeof (path), "%s%c%s.pwmeta", outputDirPath, PATH_SEP, baseName);
+    FILE* f = fopen (path, "rb");
+    if (!f) return false;
+    char magic[4]; uint32_t ver;
+    if (fread (magic, 1, 4, f) != 4 || memcmp (magic, "PWMF", 4) != 0
+        || fread (&ver, 4, 1, f) != 1 || ver != 1
+        || fread (&m, sizeof (PwMeta), 1, f) != 1) { fclose (f); return false; }
+    tx.resize ((size_t)m.scanCount); ty.resize ((size_t)m.scanCount); tz.resize ((size_t)m.scanCount);
+    if (fread (tx.data (), sizeof (double), (size_t)m.scanCount, f) != (size_t)m.scanCount
+        || fread (ty.data (), sizeof (double), (size_t)m.scanCount, f) != (size_t)m.scanCount
+        || fread (tz.data (), sizeof (double), (size_t)m.scanCount, f) != (size_t)m.scanCount)
+        { fclose (f); return false; }
+    int32_t plen = 0;
+    if (fread (&plen, 4, 1, f) != 1 || plen < 0 || plen > 4096) { fclose (f); return false; }
+    e57Path.resize ((size_t)plen);
+    fread (&e57Path[0], 1, (size_t)plen, f);
+    fclose (f);
+    return true;
+}
+
+// --- Hilfsfunktion: Dichte-Prozent → dreistelliger Ordner-/Dateiname-Code -----
+
+static GS::UniString DensityDirName (int densityPct)
 {
     char buf[8];
     snprintf (buf, sizeof (buf), "%03d", densityPct);
-    out.densityPercent = densityPct;
-    out.dirName        = GS::UniString (buf);
-    out.label          = GS::UniString (std::to_string (densityPct).c_str ()) + GS::UniString (" %");
+    return GS::UniString (buf);
 }
 
-static std::vector<int> ScanExistingResolutions (const char* outputDirPath)
-{
-    std::vector<int> result;
-    auto isDigit = [] (char c) { return c >= '0' && c <= '9'; };
-#ifdef _WIN32
-    char pattern[1024];
-    snprintf (pattern, sizeof (pattern), "%s\\*", outputDirPath);
-    WIN32_FIND_DATAA fd;
-    HANDLE h = FindFirstFileA (pattern, &fd);
-    if (h != INVALID_HANDLE_VALUE) {
-        do {
-            if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
-            const char* n = fd.cFileName;
-            if (strlen (n) == 3 && isDigit (n[0]) && isDigit (n[1]) && isDigit (n[2])) {
-                int d = atoi (n);
-                if (d >= 1 && d <= 100) result.push_back (d);
-            }
-        } while (FindNextFileA (h, &fd));
-        FindClose (h);
-    }
-#else
-    DIR* d = opendir (outputDirPath);
-    if (d) {
-        struct dirent* ent;
-        while ((ent = readdir (d)) != nullptr) {
-            if (ent->d_type != DT_DIR) continue;
-            const char* n = ent->d_name;
-            if (strlen (n) == 3 && isDigit (n[0]) && isDigit (n[1]) && isDigit (n[2])) {
-                int dens = atoi (n);
-                if (dens >= 1 && dens <= 100) result.push_back (dens);
-            }
-        }
-        closedir (d);
-    }
-#endif
-    std::sort (result.begin (), result.end ());
-    return result;
-}
 
-static void RecursiveDeleteDir (const char* dirPath)
+[[maybe_unused]] static void RecursiveDeleteDir (const char* dirPath)
 {
 #ifdef _WIN32
     char pattern[1024];
@@ -245,16 +309,13 @@ static void RecursiveDeleteDir (const char* dirPath)
 
 // --- GSM via LP_XMLConverter erzeugen ----------------------------------------
 
-// resolutions: sortiert nach densityPercent (aufsteigend)
-// activeRes:   1-basierter Index der initial aktiven Auflösung
 static bool WriteGsmViaXml (
     int         scanCount,
     const char* baseName,
     const char* outputDirPath,
     float origX, float origY, float origZ,
     float offX,  float offY,  float offZ,
-    const std::vector<ResolutionInfo>& resolutions,
-    int         activeRes,
+    int         densityPct,
     const char* e57PathStr,
     int64_t     totalPoints,
     const double* scanTx,
@@ -263,7 +324,7 @@ static bool WriteGsmViaXml (
     int           storyCount)
 {
     char guid[37];
-    GenGUID (guid);
+    GetOrCreateGuid (outputDirPath, baseName, guid);
 
 #ifdef _WIN32
     char xmlTempDir[MAX_PATH] = "C:\\Temp";
@@ -309,17 +370,13 @@ static bool WriteGsmViaXml (
         "_scale3DModelZ = scaleZ * _scaleOriginalSize\n\n"
         "mul _scale3DModelX, _scale3DModelY, _scale3DModelZ\n\n"
         "if bVisible then\n\n");
-    for (int ri = 0; ri < (int)resolutions.size (); ++ri) {
-        fprintf (f, "\tif iActiveRes = %d then\n", ri + 1);
-        for (int sc = 0; sc < scanCount; ++sc) {
-            fprintf (f, "\t\tif _sv[%d] then POINTCLOUD \"%s/%s_%s_%d.gspc\"\n",
-                sc + 1,
-                resolutions[ri].dirName.ToCStr ().Get (),
-                baseName,
-                resolutions[ri].dirName.ToCStr ().Get (),
-                sc + 1);
-        }
-        fprintf (f, "\tendif\n\n");
+    {
+        char dirName[8];
+        snprintf (dirName, sizeof (dirName), "%03d", densityPct);
+        for (int sc = 0; sc < scanCount; ++sc)
+            fprintf (f, "\tif _sv[%d] then POINTCLOUD \"%s_%s_%d.gspc\"\n",
+                sc + 1, baseName, dirName, sc + 1);
+        fprintf (f, "\n");
     }
     fprintf (f,
         "\tif bShowNumbers then\n"
@@ -543,20 +600,6 @@ static bool WriteGsmViaXml (
         "ui_separator\t0,\tyCurr,\t\t444,\tyCurr\n\n"
         "yCurr = yCurr + 9\n\n"
         "ui_style 0, 0\n");
-    // Auflösungsauswahl (nur sichtbar wenn mehrere Auflösungen vorhanden)
-    fprintf (f,
-        "if iResCount > 1 then\n"
-        "\tui_style 0, 1\n"
-        "\tui_outfield\t\t`Auflösung:`,\txPos1,\tyCurr,\toutFldWdt,\toutFldHgt\n"
-        "\tyCurr = yCurr + diffY\n\n"
-        "\tui_style 0, 0\n"
-        "\tfor _ri = 1 to iResCount\n"
-        "\t\tui_radiobutton\txPos1,\tyCurr-4,\t300,\tinFldHgt,\tiActiveRes,\t_ri,\tsResLabel[_ri]\n"
-        "\t\tyCurr = yCurr + diffY\n"
-        "\tnext _ri\n\n"
-        "\tui_separator\t0,\tyCurr,\t444,\tyCurr\n"
-        "\tyCurr = yCurr + 9\n\n"
-        "endif\n\n");
     fprintf (f, "ui_outfield\t\t`Quelldatei:`,\txPos1,\tyCurr,\toutFldWdt,\toutFldHgt\n");
     fprintf (f, "ui_outfield\t\tsE57Path,\txPos2,\tyCurr,\t444-xPos2,\toutFldHgt\n\n");
     fprintf (f, "yCurr = yCurr + diffY\n\n");
@@ -615,20 +658,6 @@ static bool WriteGsmViaXml (
     fprintf (f, "<Script_VL SectVersion=\"20\" SectionFlags=\"0\" SubIdent=\"0\">\n<![CDATA[\n");
     fprintf (f,
         "hideparameter all \"A\", \"B\", \"ZZYZX\"\n\n"
-        "! Aktive Auflösung: iActiveRes klemmen, iDensityPercent synchronisieren\n"
-        "if iActiveRes < 1 then\n"
-        "\tiActiveRes = 1\n"
-        "\tparameters iActiveRes = 1\n"
-        "endif\n"
-        "if iActiveRes > iResCount then\n"
-        "\tiActiveRes = iResCount\n"
-        "\tparameters iActiveRes = iResCount\n"
-        "endif\n"
-        "iDensityPercent = VAL (sResDir[iActiveRes])\n"
-        "parameters iDensityPercent = iDensityPercent\n"
-        "lock \"iResCount\"\n"
-        "lock \"sResDir\"\n"
-        "lock \"sResLabel\"\n\n"
         "_originalUnitX = %.8g\n"
         "_originalUnitY = %.8g\n"
         "_originalUnitZ = %.8g\n\n"
@@ -645,7 +674,6 @@ static bool WriteGsmViaXml (
         "lock \"A\", \"B\", \"ZZYZX\"\n"
         "lock \"iDensityPercent\"\n"
         "lock \"iTotalPoints\"\n"
-        "lock \"iReducedPoints\"\n"
         "lock \"iScanCount\"\n\n"
         "values \"lowerPlaneHeight\" range [ ,upperPlaneHeight)\n"
         "values \"upperPlaneHeight\" range [lowerPlaneHeight ,)\n\n"
@@ -778,10 +806,8 @@ static bool WriteGsmViaXml (
                "<Fix/><Value>1</Value></Boolean>\n");
     fprintf (f, "\t\t<Boolean Name=\"bShowNumbers\"><Description><![CDATA[\"Standortnummern anzeigen\"]]></Description>"
                "<Fix/><Value>%d</Value></Boolean>\n", scanCount > 0 ? 1 : 0);
-    // iDensityPercent: Initialwert = erste Auflösung; VL-Script hält ihn aktuell
     fprintf (f, "\t\t<Integer Name=\"iDensityPercent\"><Description><![CDATA[\"Importierte Dichte (%%)\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%d</Value></Integer>\n",
-               resolutions.empty () ? 0 : resolutions[activeRes - 1].densityPercent);
+               "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%d</Value></Integer>\n", densityPct);
     fprintf (f, "\t\t<Integer Name=\"iTotalPoints\"><Description><![CDATA[\"Gesamtpunkte\"]]></Description>"
                "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%lld</Value></Integer>\n", (long long)totalPoints);
     fprintf (f, "\t\t<String Name=\"sE57Path\"><Description><![CDATA[\"E57 Quelldatei\"]]></Description>"
@@ -789,30 +815,6 @@ static bool WriteGsmViaXml (
                "<Value><![CDATA[\"%s\"]]></Value></String>\n", e57PathStr ? e57PathStr : "");
     fprintf (f, "\t\t<Integer Name=\"iScanCount\"><Description><![CDATA[\"Anzahl Scan-Standorte\"]]></Description>"
                "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%d</Value></Integer>\n", scanCount);
-    // Auflösungs-Parameter
-    fprintf (f, "\t\t<Integer Name=\"iResCount\"><Description><![CDATA[\"Anzahl Auflösungen\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%d</Value></Integer>\n",
-               (int)resolutions.size ());
-    fprintf (f, "\t\t<Integer Name=\"iActiveRes\"><Description><![CDATA[\"Aktive Auflösung\"]]></Description>"
-               "<Fix/><Value>%d</Value></Integer>\n", activeRes);
-    // sResDir — Ordnernamen der Auflösungen (hidden)
-    fprintf (f, "\t\t<String Name=\"sResDir\"><Description><![CDATA[\"Auflösungsordner\"]]></Description>\n"
-               "\t\t\t<Fix/><Flags><ParFlg_Hidden/></Flags>\n"
-               "\t\t\t<ArrayValues FirstDimension=\"%d\" SecondDimension=\"0\">\n",
-               (int)resolutions.size ());
-    for (int ri = 0; ri < (int)resolutions.size (); ++ri)
-        fprintf (f, "\t\t\t\t<AVal Row=\"%d\"><![CDATA[\"%s\"]]></AVal>\n",
-                 ri + 1, resolutions[ri].dirName.ToCStr ().Get ());
-    fprintf (f, "\t\t\t</ArrayValues>\n\t\t</String>\n");
-    // sResLabel — Anzeigelabels der Auflösungen (hidden)
-    fprintf (f, "\t\t<String Name=\"sResLabel\"><Description><![CDATA[\"Auflösungsbezeichnungen\"]]></Description>\n"
-               "\t\t\t<Fix/><Flags><ParFlg_Hidden/></Flags>\n"
-               "\t\t\t<ArrayValues FirstDimension=\"%d\" SecondDimension=\"0\">\n",
-               (int)resolutions.size ());
-    for (int ri = 0; ri < (int)resolutions.size (); ++ri)
-        fprintf (f, "\t\t\t\t<AVal Row=\"%d\"><![CDATA[\"%s\"]]></AVal>\n",
-                 ri + 1, resolutions[ri].label.ToCStr ().Get ());
-    fprintf (f, "\t\t\t</ArrayValues>\n\t\t</String>\n");
     fprintf (f, "\t\t<Integer Name=\"gs_ui_current_page\"><Description><![CDATA[\"Aktive Seite\"]]></Description>"
                "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>1</Value></Integer>\n");
 
@@ -1133,8 +1135,6 @@ static int UpdatePlacedParams (Int32 libIdx, int newDensity, int64_t writtenPoin
                             const char* pn = (*memo.params)[j].name;
                             if (strcmp (pn, "iDensityPercent") == 0)
                                 (*memo.params)[j].value.real = (double)newDensity;
-                            else if (strcmp (pn, "iReducedPoints") == 0)
-                                (*memo.params)[j].value.real = (double)writtenPoints;
                         }
                     }
                     if (ACAPI_Element_ChangeMemo (guid, APIMemoMask_AddPars, &memo) == NoError)
@@ -1175,7 +1175,6 @@ GS::Array<PointCloudEntry> CollectOurLibParts ()
         GS::UniString e57Path;
         int density   = -1;
         int scanCount =  0;
-        int resCount  =  1;
 
         for (Int32 j = 0; j < parNum; ++j) {
             const API_AddParType& p = (*pars)[j];
@@ -1189,8 +1188,6 @@ GS::Array<PointCloudEntry> CollectOurLibParts ()
                 density = (int)(p.value.real + 0.5);
             if (strcmp (p.name, "iScanCount") == 0)
                 scanCount = (int)(p.value.real + 0.5);
-            if (strcmp (p.name, "iResCount") == 0)
-                resCount = std::max (1, (int)(p.value.real + 0.5));
         }
         ACAPI_DisposeAddParHdl (&pars);
 
@@ -1211,7 +1208,6 @@ GS::Array<PointCloudEntry> CollectOurLibParts ()
         entry.e57Path        = e57Path;
         entry.scanCount      = scanCount;
         entry.libIndex       = i;
-        entry.resCount       = resCount;
 
         UInt32 sl = FindLastSep (e57Path);
         GS::UniString e57Dir = (sl != GS::MaxUIndex)
@@ -1219,6 +1215,7 @@ GS::Array<PointCloudEntry> CollectOurLibParts ()
         IO::Location outputDirLoc (e57Dir);
         outputDirLoc.AppendToLocal (IO::Name (entry.name));
         outputDirLoc.ToPath (&entry.outputDir);
+
         result.Push (entry);
     }
     return result;
@@ -1325,26 +1322,45 @@ GS::UniString DoImport (int densityPct, const GS::UniString* forceE57Path)
     GS::UniString outputDirPath;
     outputDir.ToPath (&outputDirPath);
 
-    // Auflösungsordner anlegen (z.B. "010" für 10%)
-    ResolutionInfo newRes;
-    MakeResInfo (densityPct, newRes);
+    GS::UniString dirCode = DensityDirName (densityPct);
 
-    IO::Location resDirLoc = outputDir;
-    resDirLoc.AppendToLocal (IO::Name (newRes.dirName));
-    IO::fileSystem.CreateFolder (resDirLoc);
-    GS::UniString resDirPath;
-    resDirLoc.ToPath (&resDirPath);
-
-    // GSM schon vorhanden? → Auflösung hinzufügen
-    char existingGsmPath[1024];
-    snprintf (existingGsmPath, sizeof (existingGsmPath), "%s%c%s.gsm",
-              outputDirPath.ToCStr ().Get (), PATH_SEP, baseName.ToCStr ().Get ());
-    bool addResMode = (access (existingGsmPath, F_OK) == 0);
-    if (addResMode) {
-        char buf[256];
-        snprintf (buf, sizeof (buf), "Auflösung hinzufügen (%d%%) zu bestehendem Objekt: %s",
-                  densityPct, baseName.ToCStr ().Get ());
-        Log (buf);
+    // GSPC dieser Auflösung bereits vorhanden?
+    // → E57-Parsing überspringen, aber GSM mit gespeicherten Parametern neu erzeugen
+    {
+        char checkPath[1024];
+        snprintf (checkPath, sizeof (checkPath), "%s%c%s_%s_1.gspc",
+                  outputDirPath.ToCStr ().Get (), PATH_SEP,
+                  baseName.ToCStr ().Get (), dirCode.ToCStr ().Get ());
+        if (access (checkPath, F_OK) == 0) {
+            Log ("GSPC vorhanden, lese PwMeta fuer GSM-Regenerierung.");
+            PwMeta m = {};
+            std::vector<double> tx, ty, tz;
+            std::string metaE57;
+            if (ReadPwMeta (outputDirPath.ToCStr ().Get (),
+                             baseName.ToCStr ().Get (), m, tx, ty, tz, metaE57)) {
+                bool ok = WriteGsmViaXml (
+                    (int)m.scanCount, baseName.ToCStr ().Get (),
+                    outputDirPath.ToCStr ().Get (),
+                    m.origX, m.origY, m.origZ,
+                    m.offX,  m.offY,  m.offZ,
+                    densityPct,
+                    metaE57.empty () ? e57Path.ToCStr ().Get () : metaE57.c_str (),
+                    m.totalPoints,
+                    tx.data (), ty.data (), tz.data (),
+                    (int)m.storyCount);
+                if (ok) {
+                    RegisterLibraryDir (outputDir);
+                    Compat_ReloadLibraries ();
+                    GS::UniString msg = GS::UniString ("\"") + baseName;
+                    msg += GS::UniString ("\" - Aufloesung ");
+                    msg += GS::UniString (std::to_string (densityPct).c_str ());
+                    msg += GS::UniString ("% geladen (GSPC bereits vorhanden).");
+                    ACAPI_WriteReport (msg.ToCStr ().Get (), false);
+                    return baseName;
+                }
+            }
+            Log ("PwMeta nicht lesbar, starte vollen Import.");
+        }
     }
 
     float   bboxX = 1, bboxY = 1, bboxZ = 1;
@@ -1432,12 +1448,12 @@ GS::UniString DoImport (int densityPct, const GS::UniString* forceE57Path)
             scanTy.push_back (header.pose.translation.y);
             scanTz.push_back (header.pose.translation.z);
 
-            // baseName_resDir_scanNr.gspc  im Auflösungsordner
+            // baseName_DDD_scanNr.gspc  direkt im outputDir (kein Unterordner)
             char scanSuffix[64];
             snprintf (scanSuffix, sizeof (scanSuffix), "_%s_%lld.gspc",
-                      newRes.dirName.ToCStr ().Get (), (long long)(si + 1));
+                      dirCode.ToCStr ().Get (), (long long)(si + 1));
             GS::UniString scanGspcName = baseName + GS::UniString (scanSuffix);
-            IO::Location  scanGspcLoc  = resDirLoc;
+            IO::Location  scanGspcLoc  = outputDir;
             scanGspcLoc.AppendToLocal (IO::Name (scanGspcName));
             GS::UniString scanGspcPath;
             scanGspcLoc.ToPath (&scanGspcPath);
@@ -1527,27 +1543,12 @@ GS::UniString DoImport (int densityPct, const GS::UniString* forceE57Path)
         GS::UniString phase2 ("GSM erstellen...");
         Compat_SetNextProcessPhase (&phase2, &gsmWork);
 
-        // Alle Auflösungen zusammenstellen (bestehende + neue, sortiert)
-        std::vector<int> allDens = ScanExistingResolutions (outputDirPath.ToCStr ().Get ());
-        // Neue Auflösung ist bereits als Ordner angelegt, taucht also in allDens auf
-        if (allDens.empty ()) allDens.push_back (densityPct);
-
-        std::vector<ResolutionInfo> resolutions;
-        resolutions.reserve (allDens.size ());
-        int activeRes = 1;
-        for (int idx = 0; idx < (int)allDens.size (); ++idx) {
-            ResolutionInfo ri;
-            MakeResInfo (allDens[idx], ri);
-            resolutions.push_back (ri);
-            if (allDens[idx] == densityPct) activeRes = idx + 1;
-        }
-
         bool ok = WriteGsmViaXml (
             (int)nScans, baseName.ToCStr ().Get (),
             outputDirPath.ToCStr ().Get (),
             bboxX, bboxY, bboxZ,
             offX,  offY,  offZ,
-            resolutions, activeRes,
+            densityPct,
             e57Path.ToCStr ().Get (),
             totalOrigPoints,
             scanTx.data (), scanTy.data (), scanTz.data (),
@@ -1564,18 +1565,25 @@ GS::UniString DoImport (int densityPct, const GS::UniString* forceE57Path)
         }
     }
 
+    // PwMeta schreiben — ermoeglicht schnellen Reload (nur GSM neu, kein E57-Lesen)
+    {
+        PwMeta m = {};
+        m.origX      = bboxX;  m.origY      = bboxY;  m.origZ      = bboxZ;
+        m.offX       = offX;   m.offY       = offY;   m.offZ       = offZ;
+        m.scanCount  = (int32_t)nScans;
+        m.totalPoints = totalOrigPoints;
+        m.storyCount = (int32_t)stories.size ();
+        WritePwMeta (outputDirPath.ToCStr ().Get (), baseName.ToCStr ().Get (),
+                     m, scanTx, scanTy, scanTz, e57Path.ToCStr ().Get ());
+    }
+
     RegisterLibraryDir (outputDir);
     Compat_ReloadLibraries ();
 
-    GS::UniString msg = GS::UniString ("\"") + baseName;
-    if (addResMode)
-        msg += GS::UniString ("\" — Auflösung ")
-            + GS::UniString (std::to_string (densityPct).c_str ())
-            + GS::UniString ("% hinzugefügt.");
-    else
-        msg += GS::UniString ("\" importiert (")
-            + GS::UniString (std::to_string (densityPct).c_str ())
-            + GS::UniString ("% der Punkte).");
+    GS::UniString msg = GS::UniString ("\"") + baseName
+        + GS::UniString ("\" importiert (")
+        + GS::UniString (std::to_string (densityPct).c_str ())
+        + GS::UniString ("% der Punkte).");
     ACAPI_WriteReport (msg.ToCStr ().Get (), false);
     return baseName;
 }
@@ -1773,15 +1781,39 @@ bool TryDeleteEntry (const PointCloudEntry& entry)
     gsmLoc.ToPath (&gsmPath);
     remove (gsmPath.ToCStr ().Get ());
 
-    // Auflösungsordner (3-stellige Namen) rekursiv entfernen
-    std::vector<int> existingDens = ScanExistingResolutions (entry.outputDir.ToCStr ().Get ());
-    for (int dens : existingDens) {
-        char resDirName[8];
-        snprintf (resDirName, sizeof (resDirName), "%03d", dens);
-        char resDirPath[1024];
-        snprintf (resDirPath, sizeof (resDirPath), "%s%c%s",
-                  entry.outputDir.ToCStr ().Get (), PATH_SEP, resDirName);
-        RecursiveDeleteDir (resDirPath);
+    // Alle GSPC-Dateien im outputDir löschen (liegen flach, kein Unterordner)
+    {
+        const char* outPath = entry.outputDir.ToCStr ().Get ();
+#ifdef _WIN32
+        char pattern[1024];
+        snprintf (pattern, sizeof (pattern), "%s\\*.gspc", outPath);
+        WIN32_FIND_DATAA fd;
+        HANDLE h = FindFirstFileA (pattern, &fd);
+        if (h != INVALID_HANDLE_VALUE) {
+            do {
+                char fp[1024];
+                snprintf (fp, sizeof (fp), "%s\\%s", outPath, fd.cFileName);
+                DeleteFileA (fp);
+            } while (FindNextFileA (h, &fd));
+            FindClose (h);
+        }
+#else
+        DIR* d = opendir (outPath);
+        if (d) {
+            struct dirent* ent;
+            while ((ent = readdir (d)) != nullptr) {
+                if (ent->d_type != DT_REG) continue;
+                const char* n = ent->d_name;
+                size_t nl = strlen (n);
+                if (nl >= 5 && strcmp (n + nl - 5, ".gspc") == 0) {
+                    char fp[1024];
+                    snprintf (fp, sizeof (fp), "%s/%s", outPath, n);
+                    remove (fp);
+                }
+            }
+            closedir (d);
+        }
+#endif
     }
     rmdir (entry.outputDir.ToCStr ().Get ());
 
