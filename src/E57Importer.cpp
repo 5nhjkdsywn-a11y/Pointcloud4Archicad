@@ -478,7 +478,9 @@ static bool WriteGsmViaXml (
     fprintf (f, "<Script_3D SectVersion=\"20\" SectionFlags=\"0\" SubIdent=\"0\">\n<![CDATA[\n");
     fprintf (f,
         "! Pointcloud4Archicad - 3D Script\n\n"
-        "if bProject2D then\n"
+        "! Schnittebenen: immer fuer die Grundriss-Projektion, im 3D-Fenster nur auf Wunsch\n"
+        "_doCut = bProject2D or bCutIn3D\n\n"
+        "if _doCut then\n"
         "\t! alles oberhalb _cutTop entfernen\n"
         "\taddz _cutTop\n"
         "\tcutplane{2} 0, 1\n"
@@ -511,7 +513,7 @@ static bool WriteGsmViaXml (
         "\t\tnext _i\n"
         "\tendif\n\n"
         "endif\n\n"
-        "if bProject2D then\n"
+        "if _doCut then\n"
         "\tcutend\n"
         "\tcutend\n"
         "endif\n");
@@ -544,6 +546,8 @@ static bool WriteGsmViaXml (
         "ui_style 0, 0\n"
         "yCurr = yCurr + _dy\n\n"
         "ui_infield{3} \"bOverrideCutplane\", _x1, yCurr, _wFull, _hRow, 7, \"\", 1, 1, 0, 0, 0, 0, 1, `Eigene Schnittebenen im Grundriss`, 0, 1, `Eigene Schnittebenen im Grundriss`, 1\n"
+        "yCurr = yCurr + _dy\n"
+        "ui_infield{3} \"bCutIn3D\", _x1, yCurr, _wFull, _hRow, 7, \"\", 1, 1, 0, 0, 0, 0, 1, `Ausschnitt auch im 3D-Fenster`, 0, 1, `Ausschnitt auch im 3D-Fenster`, 1\n"
         "yCurr = yCurr + _dy\n\n"
         "! Anzeige der wirksamen Hoehen in der Arbeitseinheit des Projekts\n"
         "_unitRes = REQUEST(\"Working_length_unit\", \"\", _unitFmt)\n"
@@ -682,6 +686,8 @@ static bool WriteGsmViaXml (
                "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>0</Value></Boolean>\n");
     fprintf (f, "\t\t<Boolean Name=\"bOverrideCutplane\"><Description><![CDATA[\"Eigene Schnittebenen im Grundriss\"]]></Description>"
                "<Fix/><Flags><ParFlg_BoldName/></Flags><Value>0</Value></Boolean>\n");
+    fprintf (f, "\t\t<Boolean Name=\"bCutIn3D\"><Description><![CDATA[\"Ausschnitt auch im 3D-Fenster\"]]></Description>"
+               "<Fix/><Flags><ParFlg_Child/></Flags><Value>0</Value></Boolean>\n");
     fprintf (f, "\t\t<Length Name=\"upperPlaneHeight\"><Description><![CDATA[\"Obere Schnittebene (zum Geschoss)\"]]></Description>"
                "<Fix/><Flags><ParFlg_Child/></Flags><Value>1.1</Value></Length>\n");
     fprintf (f, "\t\t<Length Name=\"lowerPlaneHeight\"><Description><![CDATA[\"Untere Schnittebene (zum Geschoss)\"]]></Description>"
