@@ -28,6 +28,8 @@ documentation.*
 
 Bedienung über eine dockbare Palette: **Planung → Punktwolken-Palette…**
 
+![Objekt-Dialog und Palette in Archicad 26](docs/screenshot.png)
+
 ## Dateien, die der Import erzeugt
 
 ```
