@@ -1,4 +1,4 @@
-/* Localizable strings for PointCloudDensity Add-On */
+/* Localizable strings for Pointcloud4Archicad Add-On */
 
 'GDLG' 32400  Palette | topCaption | close | grow    0    0  354  218  "Punktwolken"  {
 /* [  1] */ LeftText        5    3  320   14  LargePlain  "Punktwolken"

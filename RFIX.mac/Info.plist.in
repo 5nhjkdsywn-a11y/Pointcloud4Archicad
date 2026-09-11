@@ -5,19 +5,19 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.torben.PointCloudDensity</string>
+	<string>com.torben.Pointcloud4Archicad</string>
 	<key>CFBundleName</key>
-	<string>PointCloudDensity</string>
+	<string>Pointcloud4Archicad</string>
 	<key>CFBundleGetInfoString</key>
-	<string>PointCloud Density Addon 1.0</string>
+	<string>Pointcloud4Archicad @PW_VERSION@</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>@PW_VERSION@</string>
 	<key>CFBundlePackageType</key>
 	<string>.APX</string>
 	<key>CFBundleSignature</key>
 	<string>GSAP</string>
 	<key>CFBundleVersion</key>
-	<string>1.0</string>
+	<string>@PW_VERSION@</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleIconFile</key>

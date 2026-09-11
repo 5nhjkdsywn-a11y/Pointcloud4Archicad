@@ -5,7 +5,7 @@ memory/
 *.e57
 
 # Aus .grc.in / .rc2.in generiert (CMake configure_file)
-RINT/PointCloudDensity.grc
-RFIX.win/PointCloudDensity.rc2
+RINT/Pointcloud4Archicad.grc
+RFIX.win/Pointcloud4Archicad.rc2
 
 .DS_Store

@@ -59,8 +59,8 @@ const char* kVersionStr = "v" PW_VERSION " \xC2\xB7 AC26 \xC2\xB7 " PW_PLATFORM_
 // --- Log-Pfad ----------------------------------------------------------------
 
 // Debug-Log im Benutzerkontext, nicht im Installationsordner:
-//   macOS:   ~/Library/Logs/PointCloudDensity.log
-//   Windows: %TEMP%\PointCloudDensity.log
+//   macOS:   ~/Library/Logs/Pointcloud4Archicad.log
+//   Windows: %TEMP%\Pointcloud4Archicad.log
 
 static const char* GetLogPath ()
 {
@@ -70,10 +70,10 @@ static const char* GetLogPath ()
 #ifdef _WIN32
     char tmp[MAX_PATH] = "C:\\Temp\\";
     GetTempPathA (MAX_PATH, tmp);
-    snprintf (path, sizeof (path), "%sPointCloudDensity.log", tmp);
+    snprintf (path, sizeof (path), "%sPointcloud4Archicad.log", tmp);
 #else
     const char* home = getenv ("HOME");
-    snprintf (path, sizeof (path), "%s/Library/Logs/PointCloudDensity.log", home ? home : "/tmp");
+    snprintf (path, sizeof (path), "%s/Library/Logs/Pointcloud4Archicad.log", home ? home : "/tmp");
 #endif
     return path;
 }

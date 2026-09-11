@@ -1,5 +1,5 @@
-#include "PointCloudDensity.grc.rc2"
-#include "PointCloudDensityFix.grc.rc2"
+#include "Pointcloud4Archicad.grc.rc2"
+#include "Pointcloud4ArchicadFix.grc.rc2"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION     @AC_VERSION@,0,0,0
@@ -17,9 +17,9 @@ BEGIN
             VALUE "CompanyName",      "twA"
             VALUE "FileDescription",  "Archicad @AC_VERSION@.0.0 Component"
             VALUE "FileVersion",      "@AC_VERSION@, 0, 0, 0"
-            VALUE "InternalName",     "PointCloudDensity_x64_@AC_VERSION@"
+            VALUE "InternalName",     "Pointcloud4Archicad_x64_@AC_VERSION@"
             VALUE "LegalCopyright",   "Copyright 2026 Torben Wadlinger"
-            VALUE "OriginalFilename", "PointCloudDensity_x64_@AC_VERSION@.apx"
+            VALUE "OriginalFilename", "Pointcloud4Archicad_x64_@AC_VERSION@.apx"
             VALUE "ProductName",      "Archicad"
             VALUE "ProductVersion",   "@AC_VERSION@, 0, 0, 0"
         END

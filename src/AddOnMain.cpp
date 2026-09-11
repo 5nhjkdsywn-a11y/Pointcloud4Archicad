@@ -1,5 +1,5 @@
 // *****************************************************************************
-// PointCloudDensity Add-On
+// Pointcloud4Archicad Add-On
 // E57-Punktwolken importieren und als platzierbares ArchiCAD-Objekt verwalten
 // *****************************************************************************
 

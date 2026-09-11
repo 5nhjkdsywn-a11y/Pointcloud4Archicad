@@ -108,19 +108,24 @@ if (EXISTS "${ACAPINC}")
 	string (REGEX MATCHALL "#define[ \t]+ServerMainVers_([0-9][0-9])" _vers "${ACAPIncContent}")
 	set (AC_VERSION "${CMAKE_MATCH_1}")
 	if (WIN32)
-		set (AC_ADDON_NAME "PointCloudDensity_x64_${AC_VERSION}" CACHE STRING "Add-On name" FORCE)
+		set (AC_ADDON_NAME "Pointcloud4Archicad_x64_${AC_VERSION}" CACHE STRING "Add-On name" FORCE)
 	else ()
-		set (AC_ADDON_NAME "PointCloudDensity_${CMAKE_OSX_ARCHITECTURES}_${AC_VERSION}" CACHE STRING "Add-On name" FORCE)
+		set (AC_ADDON_NAME "Pointcloud4Archicad_${CMAKE_OSX_ARCHITECTURES}_${AC_VERSION}" CACHE STRING "Add-On name" FORCE)
 	endif ()
 	message (STATUS "ArchiCAD version: ${AC_VERSION}  Addon: ${AC_ADDON_NAME}  DevKit: ${AC_API_DEVKIT_DIR}")
 	configure_file (
-		"${CMAKE_CURRENT_LIST_DIR}/RINT/PointCloudDensity.grc.in"
-		"${CMAKE_BINARY_DIR}/PointCloudDensity_generated.grc"
+		"${CMAKE_CURRENT_LIST_DIR}/RINT/Pointcloud4Archicad.grc.in"
+		"${CMAKE_BINARY_DIR}/Pointcloud4Archicad_generated.grc"
 		@ONLY)
 	if (WIN32)
 		configure_file (
-			"${CMAKE_CURRENT_LIST_DIR}/RFIX.win/PointCloudDensity.rc2.in"
-			"${CMAKE_CURRENT_LIST_DIR}/RFIX.win/PointCloudDensity.rc2"
+			"${CMAKE_CURRENT_LIST_DIR}/RFIX.win/Pointcloud4Archicad.rc2.in"
+			"${CMAKE_CURRENT_LIST_DIR}/RFIX.win/Pointcloud4Archicad.rc2"
+			@ONLY)
+	else ()
+		configure_file (
+			"${CMAKE_CURRENT_LIST_DIR}/RFIX.mac/Info.plist.in"
+			"${CMAKE_BINARY_DIR}/Info.plist"
 			@ONLY)
 	endif ()
 else ()
@@ -169,18 +174,18 @@ else ()
 	file (GLOB AddOnResourceFiles
 		"${AddOnResourcesFolder}/R${AC_ADDON_LANGUAGE}/*.grc"
 		"${AddOnResourcesFolder}/RFIX/*.grc"
-		"${AddOnResourcesFolder}/RFIX.mac/*.plist")
+		"${AddOnResourcesFolder}/RFIX.mac/*.plist.in")
 endif ()
 
 # Die generierten Dateien (aus .grc.in / .rc2.in) sind Build-Output, keine Quellen:
 # aus dem Glob nehmen, stattdessen von der Vorlage bzw. dem configure_file-Ergebnis abhängen.
-list (FILTER AddOnResourceFiles EXCLUDE REGEX "RINT/PointCloudDensity\\.grc$")
-list (FILTER AddOnResourceFiles EXCLUDE REGEX "RFIX\\.win/PointCloudDensity\\.rc2$")
+list (FILTER AddOnResourceFiles EXCLUDE REGEX "RINT/Pointcloud4Archicad\\.grc$")
+list (FILTER AddOnResourceFiles EXCLUDE REGEX "RFIX\\.win/Pointcloud4Archicad\\.rc2$")
 list (APPEND AddOnResourceFiles
-	"${AddOnResourcesFolder}/RINT/PointCloudDensity.grc.in"
-	"${CMAKE_BINARY_DIR}/PointCloudDensity_generated.grc")
+	"${AddOnResourcesFolder}/RINT/Pointcloud4Archicad.grc.in"
+	"${CMAKE_BINARY_DIR}/Pointcloud4Archicad_generated.grc")
 if (WIN32)
-	list (APPEND AddOnResourceFiles "${AddOnResourcesFolder}/RFIX.win/PointCloudDensity.rc2.in")
+	list (APPEND AddOnResourceFiles "${AddOnResourcesFolder}/RFIX.win/Pointcloud4Archicad.rc2.in")
 endif ()
 
 source_group ("Images" FILES ${AddOnImageFiles})
@@ -208,8 +213,8 @@ else ()
 		COMMENT "Compiling resources..."
 		COMMAND ${CMAKE_COMMAND} -E make_directory "${ResourceObjectsDir}"
 		COMMAND ${CMAKE_COMMAND} -E copy
-		        "${CMAKE_BINARY_DIR}/PointCloudDensity_generated.grc"
-		        "${AddOnResourcesFolder}/RINT/PointCloudDensity.grc"
+		        "${CMAKE_BINARY_DIR}/Pointcloud4Archicad_generated.grc"
+		        "${AddOnResourcesFolder}/RINT/Pointcloud4Archicad.grc"
 		COMMAND python3 "${APIDevKitToolsDir}/CompileResources.py"
 		        "${AC_ADDON_LANGUAGE}" "${AC_API_DEVKIT_DIR}"
 		        "${AddOnSourcesFolder}" "${AddOnResourcesFolder}"
@@ -240,7 +245,7 @@ if (WIN32)
 else ()
 	set_target_properties (AddOn PROPERTIES BUNDLE TRUE)
 	set_target_properties (AddOn PROPERTIES
-		MACOSX_BUNDLE_INFO_PLIST "${AddOnResourcesFolder}/RFIX.mac/Info.plist")
+		MACOSX_BUNDLE_INFO_PLIST "${CMAKE_BINARY_DIR}/Info.plist")
 	set_target_properties (AddOn PROPERTIES
 		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
 endif ()
