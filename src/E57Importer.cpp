@@ -15,6 +15,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -57,11 +58,25 @@ const char* kVersionStr = "v" PW_VERSION " \xC2\xB7 AC26 \xC2\xB7 " PW_PLATFORM_
 
 // --- Log-Pfad ----------------------------------------------------------------
 
+// Debug-Log im Benutzerkontext, nicht im Installationsordner:
+//   macOS:   ~/Library/Logs/PointCloudDensity.log
+//   Windows: %TEMP%\PointCloudDensity.log
+
+static const char* GetLogPath ()
+{
+    static char path[1024] = {};
+    if (path[0] != '\0')
+        return path;
 #ifdef _WIN32
-static const char* LOG_PATH = "C:\\ProgramData\\GRAPHISOFT\\punktwolke_addon\\pcd_debug.log";
+    char tmp[MAX_PATH] = "C:\\Temp\\";
+    GetTempPathA (MAX_PATH, tmp);
+    snprintf (path, sizeof (path), "%sPointCloudDensity.log", tmp);
 #else
-static const char* LOG_PATH = "/Applications/GRAPHISOFT/punktwolke_addon/pcd_debug.log";
+    const char* home = getenv ("HOME");
+    snprintf (path, sizeof (path), "%s/Library/Logs/PointCloudDensity.log", home ? home : "/tmp");
 #endif
+    return path;
+}
 
 // =============================================================================
 // Interne Hilfsfunktionen
@@ -71,7 +86,7 @@ static const char* LOG_PATH = "/Applications/GRAPHISOFT/punktwolke_addon/pcd_deb
 
 void Log (const char* msg)
 {
-    FILE* f = fopen (LOG_PATH, "a");
+    FILE* f = fopen (GetLogPath (), "a");
     if (f) { fprintf (f, "%s\n", msg); fclose (f); }
 }
 

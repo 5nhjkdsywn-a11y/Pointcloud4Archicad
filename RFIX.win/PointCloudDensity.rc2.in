@@ -18,7 +18,7 @@ BEGIN
             VALUE "FileDescription",  "Archicad @AC_VERSION@.0.0 Component"
             VALUE "FileVersion",      "@AC_VERSION@, 0, 0, 0"
             VALUE "InternalName",     "PointCloudDensity_x64_@AC_VERSION@"
-            VALUE "LegalCopyright",   "Copyright 2024 twA"
+            VALUE "LegalCopyright",   "Copyright 2026 Torben Wadlinger"
             VALUE "OriginalFilename", "PointCloudDensity_x64_@AC_VERSION@.apx"
             VALUE "ProductName",      "Archicad"
             VALUE "ProductVersion",   "@AC_VERSION@, 0, 0, 0"

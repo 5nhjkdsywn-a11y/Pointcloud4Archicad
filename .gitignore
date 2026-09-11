@@ -4,4 +4,8 @@ memory/
 *.gsm
 *.e57
 
+# Aus .grc.in / .rc2.in generiert (CMake configure_file)
+RINT/PointCloudDensity.grc
+RFIX.win/PointCloudDensity.rc2
+
 .DS_Store

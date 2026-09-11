@@ -172,6 +172,17 @@ else ()
 		"${AddOnResourcesFolder}/RFIX.mac/*.plist")
 endif ()
 
+# Die generierten Dateien (aus .grc.in / .rc2.in) sind Build-Output, keine Quellen:
+# aus dem Glob nehmen, stattdessen von der Vorlage bzw. dem configure_file-Ergebnis abhängen.
+list (FILTER AddOnResourceFiles EXCLUDE REGEX "RINT/PointCloudDensity\\.grc$")
+list (FILTER AddOnResourceFiles EXCLUDE REGEX "RFIX\\.win/PointCloudDensity\\.rc2$")
+list (APPEND AddOnResourceFiles
+	"${AddOnResourcesFolder}/RINT/PointCloudDensity.grc.in"
+	"${CMAKE_BINARY_DIR}/PointCloudDensity_generated.grc")
+if (WIN32)
+	list (APPEND AddOnResourceFiles "${AddOnResourcesFolder}/RFIX.win/PointCloudDensity.rc2.in")
+endif ()
+
 source_group ("Images" FILES ${AddOnImageFiles})
 source_group ("Resources" FILES ${AddOnResourceFiles})
 
