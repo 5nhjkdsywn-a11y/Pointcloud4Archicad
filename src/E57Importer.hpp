@@ -59,5 +59,6 @@ GS::UniString               DoImport            (int densityPct,
                                                   const GS::UniString* forceE57Path = nullptr);
 bool                        TryDeleteEntry      (const PointCloudEntry& entry);
 void                        AutoPlaceEntry      (const PointCloudEntry& entry);
+bool                        HasPlacedInstances  (Int32 libIndex);
 
 #endif // E57IMPORTER_HPP

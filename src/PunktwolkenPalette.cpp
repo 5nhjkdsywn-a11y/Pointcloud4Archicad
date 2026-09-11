@@ -187,7 +187,9 @@ void PunktwolkenPalette::ButtonClicked (const DG::ButtonClickEvent& ev)
         if (!newName.IsEmpty ()) {
             for (UInt32 i = 0; i < entries.GetSize (); ++i) {
                 if (entries[i].name == newName) {
-                    AutoPlaceEntry (entries[i]);
+                    // Erneuter Import derselben E57 (GSM-Neuerzeugung): kein zweites Objekt
+                    if (!HasPlacedInstances (entries[i].libIndex))
+                        AutoPlaceEntry (entries[i]);
                     break;
                 }
             }

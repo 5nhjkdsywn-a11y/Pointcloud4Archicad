@@ -1111,6 +1111,23 @@ GS::Array<PointCloudEntry> CollectOurLibParts ()
     return result;
 }
 
+// --- HasPlacedInstances ------------------------------------------------------
+// true, wenn mindestens ein Objekt dieses Bibliothekselements im Projekt liegt
+
+bool HasPlacedInstances (Int32 libIndex)
+{
+    GS::Array<API_Guid> elemList;
+    ACAPI_Element_GetElemList (API_ObjectID, &elemList);
+    for (const auto& guid : elemList) {
+        API_Element elem = {};
+        elem.header.guid = guid;
+        if (ACAPI_Element_Get (&elem) != NoError) continue;
+        if (elem.object.libInd == libIndex)
+            return true;
+    }
+    return false;
+}
+
 // --- AutoPlaceEntry ----------------------------------------------------------
 
 void AutoPlaceEntry (const PointCloudEntry& entry)
