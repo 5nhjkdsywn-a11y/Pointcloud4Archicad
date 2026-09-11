@@ -339,10 +339,14 @@ static bool WriteGsmViaXml (
     FILE* f = fopen (xmlPath, "w");
     if (!f) return false;
 
+    // Owner/Signature sind FourCC-Codes (APIdefs_LibraryParts.h), NICHT die Add-on-MDID:
+    //   Owner     = 'GSAC' = APILibOwner_ArchiCAD — jeder andere Wert macht das GSM zum
+    //               ESYM (externes Symbol), das einen ESYM-Handler im Add-on voraussetzt
+    //   Signature = 'GSYM' = normales Objekt (wie beim Graphisoft-Punktwolken-Objekt)
     fprintf (f, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     fprintf (f, "<Symbol IsArchivable=\"false\" IsPlaceable=\"true\" "
                "MainGUID=\"%s\" MigrationValue=\"Normal\" "
-               "Owner=\"1196638531\" Signature=\"1196644685\" Version=\"44\">\n\n", guid);
+               "Owner=\"1196638531\" Signature=\"1196644685\" Version=\"44\">\n\n", guid);   // 'GSAC' / 'GSYM'
 
     fprintf (f,
         "<Ancestry SectVersion=\"1\" SectionFlags=\"0\" SubIdent=\"0\" Template=\"false\">\n"
