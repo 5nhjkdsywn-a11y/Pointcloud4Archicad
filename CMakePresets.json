@@ -7,7 +7,7 @@
       "generator": "Xcode",
       "binaryDir": "${sourceDir}/build/ac26",
       "cacheVariables": {
-        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-26.7000/API",
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/macos/API.Development.Kit.MAC.26.7000",
         "CMAKE_BUILD_TYPE": "Debug"
       }
     },
@@ -17,7 +17,7 @@
       "generator": "Xcode",
       "binaryDir": "${sourceDir}/build/ac26",
       "cacheVariables": {
-        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-26.7000/API",
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/macos/API.Development.Kit.MAC.26.7000",
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
@@ -27,7 +27,7 @@
       "generator": "Xcode",
       "binaryDir": "${sourceDir}/build/ac27",
       "cacheVariables": {
-        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-27.6003/API",
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/macos/API.Development.Kit.MAC.27.6003",
         "CMAKE_BUILD_TYPE": "Debug"
       }
     },
@@ -37,7 +37,7 @@
       "generator": "Xcode",
       "binaryDir": "${sourceDir}/build/ac27",
       "cacheVariables": {
-        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-27.6003/API",
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/macos/API.Development.Kit.MAC.27.6003",
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
@@ -47,7 +47,7 @@
       "generator": "Xcode",
       "binaryDir": "${sourceDir}/build/ac28",
       "cacheVariables": {
-        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-28.4001/API",
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/macos/API.Development.Kit.MAC.28.4001",
         "CMAKE_BUILD_TYPE": "Debug"
       }
     },
@@ -57,7 +57,7 @@
       "generator": "Xcode",
       "binaryDir": "${sourceDir}/build/ac28",
       "cacheVariables": {
-        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-28.4001/API",
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/macos/API.Development.Kit.MAC.28.4001",
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
@@ -67,7 +67,7 @@
       "generator": "Xcode",
       "binaryDir": "${sourceDir}/build/ac29",
       "cacheVariables": {
-        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-29.3100/API",
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/macos/API.Development.Kit.MAC.29.3100",
         "CMAKE_BUILD_TYPE": "Debug"
       }
     },
@@ -77,7 +77,7 @@
       "generator": "Xcode",
       "binaryDir": "${sourceDir}/build/ac29",
       "cacheVariables": {
-        "AC_API_DEVKIT_DIR": "${sourceDir}/../macos/archicad-api-devkit-29.3100/API",
+        "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/macos/API.Development.Kit.MAC.29.3100",
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
