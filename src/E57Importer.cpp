@@ -372,84 +372,36 @@ static bool WriteGsmViaXml (
         "<CalledMacros SectVersion=\"2\" SectionFlags=\"0\" SubIdent=\"0\">\n"
         "</CalledMacros>\n\n");
 
-    // 3D-Script
-    fprintf (f, "<Script_3D SectVersion=\"20\" SectionFlags=\"0\" SubIdent=\"0\">\n<![CDATA[\n");
-    fprintf (f,
-        "if bProject2D then\n"
-        "\taddz _upperCutPlaneHeight\n"
-        "\tcutplane{2} 0, 1\n"
-        "\tdel 1\n\n"
-        "\taddz _lowerCutPlaneHeight\n"
-        "\trotx 180\n"
-        "\tcutplane{2} 0, 1\n"
-        "\tdel 2\n"
-        "endif\n\n"
-        "_scale3DModelX = scaleX * _scaleOriginalSize\n"
-        "_scale3DModelY = scaleY * _scaleOriginalSize\n"
-        "_scale3DModelZ = scaleZ * _scaleOriginalSize\n\n"
-        "mul _scale3DModelX, _scale3DModelY, _scale3DModelZ\n\n"
-        "if bVisible then\n\n");
-    {
-        char dirName[8];
-        snprintf (dirName, sizeof (dirName), "%03d", densityPct);
-        for (int sc = 0; sc < scanCount; ++sc)
-            fprintf (f, "\tif _sv[%d] then POINTCLOUD \"%s_%s_%d.gspc\"\n",
-                sc + 1, baseName, dirName, sc + 1);
-        fprintf (f, "\n");
-    }
-    fprintf (f,
-        "\tif bShowNumbers then\n"
-        "\t\tDEFINE STYLE \"scannum\" \"Arial\", 300, 1, 2\n"
-        "\t\tSET STYLE \"scannum\"\n\n"
-        "\t\tfor _i = 1 to iScanCount\n"
-        "\t\t\tif _sv[_i] then\n"
-        "\t\t\t\tADD xScan[_i], yScan[_i], zScan[_i]\n"
-        "\t\t\t\tTEXT 0.01, 0, STR(_i, 1, 0)\n"
-        "\t\t\t\tDEL 1\n"
-        "\t\t\tendif\n"
-        "\t\tnext _i\n"
-        "\tendif\n\n"
-        "endif\n\n"
-        "del 1\n\n"
-        "if bProject2D then\n"
-        "\tcutend\n"
-        "\tcutend\n"
-        "endif\n");
-    fprintf (f, "]]>\n</Script_3D>\n\n");
+    // -------------------------------------------------------------------------
+    // GDL-Scripts — eigene Implementierung (Pointcloud4Archicad)
+    //
+    // Grundriss: das 3D-Modell wird per project2{2} mit bProject2D=1 projiziert;
+    // im 3D-Script begrenzen zwei cutplane{2}-Ebenen den Ausschnitt auf den
+    // Bereich zwischen _cutBottom und _cutTop (Geschoss-Schnittebene oder
+    // per bOverrideCutplane eigene Hoehen). Alle Hoehen relativ zum Objektursprung.
+    // -------------------------------------------------------------------------
 
-    // 2D-Script
-    fprintf (f, "<Script_2D SectVersion=\"20\" SectionFlags=\"0\" SubIdent=\"0\">\n<![CDATA[\n");
-    fprintf (f,
-        "project2{2} 3, 270, 3,\n"
-        "\t\t\tparameters bProject2D = 1\n\n");
-    fprintf (f, "]]>\n</Script_2D>\n\n");
-
-    // Master-Script (1D)
+    // Master-Script (1D): Schnittebenen-Hoehen berechnen; im VL-Script (Typ 5)
+    // sind die GLOB_*-Geschossvariablen nicht verfuegbar.
     fprintf (f, "<Script_1D SectVersion=\"20\" SectionFlags=\"0\" SubIdent=\"0\">\n<![CDATA[\n");
     fprintf (f,
-        "EPS = 0.00001\n\n"
-        "MODEL_UNIT_M\t= 1\n"
-        "MODEL_UNIT_CM\t= 2\n"
-        "MODEL_UNIT_MM\t= 3\n"
-        "MODEL_UNIT_FT\t= 4\n"
-        "MODEL_UNIT_IN\t= 5\n\n"
-        "_scaleOriginalSize = 1\n"
-        "if iModelUnit = MODEL_UNIT_MM\tthen\t_scaleOriginalSize = 0.001\n"
-        "if iModelUnit = MODEL_UNIT_CM\tthen\t_scaleOriginalSize = 0.01\n"
-        "if iModelUnit = MODEL_UNIT_IN\tthen\t_scaleOriginalSize = 0.0254\n"
-        "if iModelUnit = MODEL_UNIT_FT\tthen\t_scaleOriginalSize = 0.3048\n\n"
+        "! Pointcloud4Archicad - Master Script\n\n"
+        "_cutTop    = 0\n"
+        "_cutBottom = 0\n"
         "if GLOB_SCRIPT_TYPE <> 5 then\n"
+        "\t_storyShift = GLOB_CSTORY_ELEV - GLOB_HSTORY_ELEV\n"
         "\tif bOverrideCutplane then\n"
-        "\t\t_upperCutPlaneHeight = GLOB_CSTORY_ELEV - GLOB_HSTORY_ELEV + upperPlaneHeight - GLOB_ELEVATION\n"
-        "\t\t_lowerCutPlaneHeight = GLOB_CSTORY_ELEV - GLOB_HSTORY_ELEV + lowerPlaneHeight - GLOB_ELEVATION\n"
+        "\t\t_cutTop    = _storyShift + upperPlaneHeight - GLOB_ELEVATION\n"
+        "\t\t_cutBottom = _storyShift + lowerPlaneHeight - GLOB_ELEVATION\n"
         "\telse\n"
-        "\t\t_upperCutPlaneHeight = GLOB_CSTORY_ELEV - GLOB_HSTORY_ELEV + GLOB_CUTPLANES_INFO[1]\n"
-        "\t\t_lowerCutPlaneHeight = GLOB_CSTORY_ELEV - GLOB_HSTORY_ELEV + GLOB_CUTPLANES_INFO[3]\n"
+        "\t\t_cutTop    = _storyShift + GLOB_CUTPLANES_INFO[1]\n"
+        "\t\t_cutBottom = _storyShift + GLOB_CUTPLANES_INFO[3]\n"
         "\tendif\n"
         "endif\n\n");
 
     if (scanCount > 0) {
         fprintf (f,
+            "! Scan-Standorte den Geschossen zuordnen (live per REQUEST, kein statischer Stand)\n"
             "dim _sg[]\n"
             "dim _sv[]\n"
             "dim _stTab[]\n"
@@ -509,119 +461,122 @@ static bool WriteGsmViaXml (
             "\t_sv[_i] = bGroup[_bGIdx] AND bScan[_i]\n"
             "next _i\n\n");
     }
-
     fprintf (f, "]]>\n</Script_1D>\n\n");
 
-    // UI-Script
+    // 2D-Script: Projektion des geschnittenen 3D-Modells + Griffpunkte an der Bounding-Box
+    fprintf (f, "<Script_2D SectVersion=\"20\" SectionFlags=\"0\" SubIdent=\"0\">\n<![CDATA[\n");
+    fprintf (f,
+        "! Pointcloud4Archicad - 2D Script\n\n"
+        "hotspot2 0, 0, 1\n"
+        "hotspot2 A, 0, 2\n"
+        "hotspot2 A, B, 3\n"
+        "hotspot2 0, B, 4\n\n"
+        "project2{2} 3, 270, 3, parameters bProject2D = 1\n");
+    fprintf (f, "]]>\n</Script_2D>\n\n");
+
+    // 3D-Script: Schnittebenen (nur bei Grundriss-Projektion), Punktwolken, Standortnummern
+    fprintf (f, "<Script_3D SectVersion=\"20\" SectionFlags=\"0\" SubIdent=\"0\">\n<![CDATA[\n");
+    fprintf (f,
+        "! Pointcloud4Archicad - 3D Script\n\n"
+        "if bProject2D then\n"
+        "\t! alles oberhalb _cutTop entfernen\n"
+        "\taddz _cutTop\n"
+        "\tcutplane{2} 0, 1\n"
+        "\tdel 1\n"
+        "\t! alles unterhalb _cutBottom entfernen (Ebene um 180 Grad gedreht)\n"
+        "\taddz _cutBottom\n"
+        "\trotx 180\n"
+        "\tcutplane{2} 0, 1\n"
+        "\tdel 2\n"
+        "endif\n\n"
+        "if bVisible then\n\n");
+    {
+        char dirName[8];
+        snprintf (dirName, sizeof (dirName), "%03d", densityPct);
+        for (int sc = 0; sc < scanCount; ++sc)
+            fprintf (f, "\tif _sv[%d] then POINTCLOUD \"%s_%s_%d.gspc\"\n",
+                sc + 1, baseName, dirName, sc + 1);
+        fprintf (f, "\n");
+    }
+    fprintf (f,
+        "\tif bShowNumbers then\n"
+        "\t\tDEFINE STYLE \"scannum\" \"Arial\", 300, 1, 2\n"
+        "\t\tSET STYLE \"scannum\"\n\n"
+        "\t\tfor _i = 1 to iScanCount\n"
+        "\t\t\tif _sv[_i] then\n"
+        "\t\t\t\tADD xScan[_i], yScan[_i], zScan[_i]\n"
+        "\t\t\t\tTEXT 0.01, 0, STR(_i, 1, 0)\n"
+        "\t\t\t\tDEL 1\n"
+        "\t\t\tendif\n"
+        "\t\tnext _i\n"
+        "\tendif\n\n"
+        "endif\n\n"
+        "if bProject2D then\n"
+        "\tcutend\n"
+        "\tcutend\n"
+        "endif\n");
+    fprintf (f, "]]>\n</Script_3D>\n\n");
+
+    // UI-Script: Seite 1 "Darstellung", Seite 2 "Standorte" (nur bei Scan-Standorten)
     fprintf (f, "<Script_UI SectVersion=\"20\" SectionFlags=\"0\" SubIdent=\"0\">\n<![CDATA[\n");
     fprintf (f,
-        "dim\tstUIValues[]\n"
-        "\tstUIValues[1]\t= `Einheit und Masstab Einstellungen`\n"
-        "\tstUIValues[2]\t= `Modell Einheit`\n"
-        "\tstUIValues[3]\t= `Modellmastab X`\n"
-        "\tstUIValues[4]\t= `Modellmastab Y`\n"
-        "\tstUIValues[5]\t= `Modellmastab Z`\n"
-        "\tstUIValues[6]\t= `Datei Bezeichnung`\n"
-        "\tstUIValues[7]\t= `Punktewolke Datei wurde nicht gefunden`\n"
-        "\tstUIValues[8]\t= `Uberschreibe Grundrissdarstellungsauswahl`\n"
-        "\tstUIValues[9]\t= `Hohe obere Ebene`\n"
-        "\tstUIValues[10]\t= `Hohe untere Ebene`\n\n"
-        "outFldWdt\t= 180\n"
-        "inFldWdt\t= 108\n"
-        "buttonWdt\t= 20\n\n"
-        "xPos1\t\t= 5\n"
-        "xPos2\t\t= xPos1 + outFldWdt + 5\n"
-        "xPos3\t\t= xPos2 + inFldWdt + 5\n\n"
-        "yStart\t\t= 5\n"
-        "diffY\t\t= 25\n\n"
-        "outFldHgt\t= 15\n"
-        "inFldHgt\t= 19\n"
-        "buttonHgt\t= inFldHgt + 2 * diffY\n\n"
+        "! Pointcloud4Archicad - UI Script\n\n"
+        "_x1 = 8\n"
+        "_x2 = 200\n"
+        "_wFull = 444 - _x1\n"
+        "_wLbl  = _x2 - _x1\n"
+        "_wVal  = 444 - _x2 - 8\n"
+        "_hRow  = 20\n"
+        "_dy    = 26\n\n"
         "ui_dialog `Punktwolke`\n\n"
         "ui_current_page gs_ui_current_page\n\n"
         "ui_page 1, -1, `Darstellung`\n\n"
-        "yCurr = yStart\n\n"
+        "yStart = 8\n"
+        "yCurr  = yStart\n\n"
+        "ui_infield \"bVisible\",     _x1, yCurr, _wFull, _hRow\n"
+        "yCurr = yCurr + _dy\n"
+        "ui_infield \"bShowNumbers\", _x1, yCurr, _wFull, _hRow\n"
+        "yCurr = yCurr + _dy\n\n"
+        "ui_separator _x1, yCurr, 444 - _x1, yCurr\n"
+        "yCurr = yCurr + 10\n\n"
         "ui_style 0, 1\n"
-        "ui_infield{3}\t\"bVisible\",\txPos1,\tyCurr-4,\t444-xPos1,\tinFldHgt,\n"
-        "\t7, \"\", 1, 1,\n"
-        "\t0, 0, 0, 0,\n"
-        "\t1, `Punktwolke anzeigen`,\t0,\n"
-        "\t1, `Punktwolke anzeigen`,\t1\n"
-        "yCurr = yCurr + diffY\n\n"
-        "ui_infield{3}\t\"bShowNumbers\",\txPos1,\tyCurr-4,\t444-xPos1,\tinFldHgt,\n"
-        "\t7, \"\", 1, 1,\n"
-        "\t0, 0, 0, 0,\n"
-        "\t1, `Standortnummern anzeigen`,\t0,\n"
-        "\t1, `Standortnummern anzeigen`,\t1\n"
-        "yCurr = yCurr + diffY + 2\n\n"
-        "ui_separator\t0,\tyCurr,\t\t444,\tyCurr\n\n"
-        "yCurr = yCurr + 9\n\n"
-        "ui_style 0, 1\n"
-        "ui_outfield\t\tstUIValues[1],\txPos1,\tyCurr,\t\t444-xPos1,\toutFldHgt\n\n"
-        "yCurr = yCurr + diffY\n\n"
+        "ui_outfield `Grundriss-Ausschnitt`, _x1, yCurr, _wFull, _hRow\n"
         "ui_style 0, 0\n"
-        "ui_outfield\t\tstUIValues[2],\txPos1,\tyCurr,\t\toutFldWdt,\toutFldHgt\n"
-        "ui_infield{3}\t\"iModelUnit\",\txPos2,\tyCurr-4,\tinFldWdt,\tinFldHgt,\n"
-        "\t8, \"\", 1, 1,\n"
-        "\t0, 0, 0, 0,\n"
-        "\t\"\",\t`Millimeter`,\tMODEL_UNIT_MM,\n"
-        "\t\"\",\t`Zentimeter`,\tMODEL_UNIT_CM,\n"
-        "\t\"\",\t`Meter`, \t\tMODEL_UNIT_M,\n"
-        "\t\"\",\t`Inch`,\t\t\tMODEL_UNIT_IN,\n"
-        "\t\"\",\t`Fuss`,\t\t\tMODEL_UNIT_FT\n\n"
-        "yCurr = yCurr + diffY\n\n"
-        "ui_outfield\t\tstUIValues[3],\txPos1,\tyCurr,\t\toutFldWdt,\toutFldHgt\n"
-        "ui_infield{3}\t\"scaleX\",\t\txPos2,\tyCurr-4,\tinFldWdt,\tinFldHgt\n\n"
-        "ui_infield{3}\t\"bLinkScale\",\txPos3,\tyCurr-4,\tbuttonWdt,\tbuttonHgt,\n"
-        "\t6, 1, 2, 1,\n"
-        "\t8, 26, 18, 54,\n"
-        "\t1, \"\", 0,\n"
-        "\t2, \"\", 1\n\n"
-        "yCurr = yCurr + diffY\n\n"
-        "ui_outfield\t\tstUIValues[4],\txPos1,\tyCurr,\t\toutFldWdt,\toutFldHgt\n"
-        "ui_infield{3}\t\"scaleY\",\t\txPos2,\tyCurr-4,\tinFldWdt,\tinFldHgt\n\n"
-        "yCurr = yCurr + diffY\n\n"
-        "ui_outfield\t\tstUIValues[5],\txPos1,\tyCurr,\t\toutFldWdt,\toutFldHgt\n"
-        "ui_infield{3}\t\"scaleZ\",\t\txPos2,\tyCurr-4,\tinFldWdt,\tinFldHgt\n\n"
-        "yCurr = yCurr + diffY + 2\n\n"
-        "ui_separator\t0,\tyCurr,\t\t444,\tyCurr\n\n"
-        "yCurr = yCurr + 9\n\n"
+        "yCurr = yCurr + _dy\n\n"
+        "ui_infield \"bOverrideCutplane\", _x1, yCurr, _wFull, _hRow\n"
+        "yCurr = yCurr + _dy\n\n"
+        "! Anzeige der wirksamen Hoehen in der Arbeitseinheit des Projekts\n"
+        "_unitRes = REQUEST(\"Working_length_unit\", \"\", _unitFmt)\n"
+        "if _unitRes < 1 then _unitFmt = \"%%.2m\"\n\n"
+        "ui_outfield `Obere Schnittebene`, _x1, yCurr + 3, _wLbl, _hRow\n"
+        "if bOverrideCutplane then\n"
+        "\tui_infield \"upperPlaneHeight\", _x2, yCurr, _wVal, _hRow\n"
+        "else\n"
+        "\tui_outfield STR(_unitFmt, GLOB_CUTPLANES_INFO[1] + GLOB_ELEVATION), _x2, yCurr + 3, _wVal, _hRow\n"
+        "endif\n"
+        "yCurr = yCurr + _dy\n\n"
+        "ui_outfield `Untere Schnittebene`, _x1, yCurr + 3, _wLbl, _hRow\n"
+        "if bOverrideCutplane then\n"
+        "\tui_infield \"lowerPlaneHeight\", _x2, yCurr, _wVal, _hRow\n"
+        "else\n"
+        "\tui_outfield STR(_unitFmt, GLOB_CUTPLANES_INFO[3] + GLOB_ELEVATION), _x2, yCurr + 3, _wVal, _hRow\n"
+        "endif\n"
+        "yCurr = yCurr + _dy\n\n"
+        "ui_separator _x1, yCurr, 444 - _x1, yCurr\n"
+        "yCurr = yCurr + 10\n\n"
         "ui_style 0, 1\n"
-        "ui_infield{3}\t\"bOverrideCutplane\",\txPos1,\tyCurr-4,\t444-xPos1,\tinFldHgt,\n"
-        "\t7, \"\", 1, 1,\n"
-        "\t0, 0, 0, 0,\n"
-        "\t1, stUIValues[8],\t0,\n"
-        "\t1, stUIValues[8],\t1\n\n"
-        "yCurr = yCurr + diffY\n\n"
-        "ui_style 0, 0\n\n"
-        "_upperPlaneHeight = GLOB_CUTPLANES_INFO[1] + GLOB_ELEVATION\n"
-        "_lowerPlaneHeight = GLOB_CUTPLANES_INFO[3] + GLOB_ELEVATION\n\n"
-        "result = REQUEST(\"Working_length_unit\", \"\", workingUnits)\n\n"
-        "if result < 1 then\n"
-        "\tworkingUnits = \"%%.0mm\"\n"
-        "endif\n\n"
-        "_stUpperPlaneHeight = STR(workingUnits, _upperPlaneHeight)\n"
-        "_stLowerPlaneHeight = STR(workingUnits, _lowerPlaneHeight)\n\n"
-        "ui_outfield\t\tstUIValues[9],\t\txPos1,\tyCurr,\t\toutFldWdt,\toutFldHgt\n\n"
-        "if bOverrideCutplane then\n"
-        "\tui_infield{3}\t\"upperPlaneHeight\",\txPos2,\tyCurr-4,\tinFldWdt,\tinFldHgt\n"
-        "else\n"
-        "\tui_outfield\t_stUpperPlaneHeight,\txPos2,\tyCurr,\tinFldWdt,\toutFldHgt\n"
-        "endif\n\n"
-        "yCurr = yCurr + diffY\n\n"
-        "ui_outfield\t\tstUIValues[10],\t\txPos1,\tyCurr,\t\toutFldWdt,\toutFldHgt\n\n"
-        "if bOverrideCutplane then\n"
-        "\tui_infield{3}\t\"lowerPlaneHeight\",\txPos2,\tyCurr-4,\tinFldWdt,\tinFldHgt\n"
-        "else\n"
-        "\tui_outfield\t_stLowerPlaneHeight,\txPos2,\tyCurr,\tinFldWdt,\toutFldHgt\n"
-        "endif\n\n"
-        "yCurr = yCurr + diffY\n\n"
-        "ui_separator\t0,\tyCurr,\t\t444,\tyCurr\n\n"
-        "yCurr = yCurr + 9\n\n"
-        "ui_style 0, 0\n");
-    fprintf (f, "ui_outfield\t\t`Quelldatei:`,\txPos1,\tyCurr,\toutFldWdt,\toutFldHgt\n");
-    fprintf (f, "ui_outfield\t\tsE57Path,\txPos2,\tyCurr,\t444-xPos2,\toutFldHgt\n\n");
-    fprintf (f, "yCurr = yCurr + diffY\n\n");
+        "ui_outfield `Import`, _x1, yCurr, _wFull, _hRow\n"
+        "ui_style 0, 0\n"
+        "yCurr = yCurr + _dy\n\n"
+        "ui_outfield `Quelldatei`, _x1, yCurr, _wLbl, _hRow\n"
+        "ui_outfield sE57Path, _x2, yCurr, _wVal, _hRow\n"
+        "yCurr = yCurr + _dy\n\n"
+        "ui_outfield `Dichte`, _x1, yCurr, _wLbl, _hRow\n"
+        "ui_outfield STR(iDensityPercent, 1, 0) + ` %% von ` + STR(iTotalPoints, 1, 0) + ` Punkten`, _x2, yCurr, _wVal, _hRow\n"
+        "yCurr = yCurr + _dy\n\n"
+        "ui_outfield `Scan-Standorte`, _x1, yCurr, _wLbl, _hRow\n"
+        "ui_outfield STR(iScanCount, 1, 0), _x2, yCurr, _wVal, _hRow\n"
+        "yCurr = yCurr + _dy\n\n");
 
     if (scanCount > 0) {
         fprintf (f,
@@ -673,84 +628,24 @@ static bool WriteGsmViaXml (
 
     fprintf (f, "]]>\n</Script_UI>\n\n");
 
-    // VL-Script
+    // VL-Script: Ausdehnung aus der Bounding-Box fest setzen, Wertebereiche
     fprintf (f, "<Script_VL SectVersion=\"20\" SectionFlags=\"0\" SubIdent=\"0\">\n<![CDATA[\n");
     fprintf (f,
-        "hideparameter all \"A\", \"B\", \"ZZYZX\"\n\n"
-        "_originalUnitX = %.8g\n"
-        "_originalUnitY = %.8g\n"
-        "_originalUnitZ = %.8g\n\n"
-        "A\t\t= _scaleOriginalSize * _originalUnitX * scaleX\n"
-        "B\t\t= _scaleOriginalSize * _originalUnitY * scaleY\n"
-        "ZZYZX\t= _scaleOriginalSize * _originalUnitZ * scaleZ\n\n"
-        "ac_bottomlevel\t= 0\n"
-        "ac_toplevel\t\t= ZZYZX\n\n"
-        "parameters\tA\t\t= A,\n"
-        "\t\t\t\tB\t\t= B,\n"
-        "\t\t\t\tZZYZX\t= ZZYZX,\n"
-        "\t\t\t\tac_bottomlevel\t= ac_bottomlevel,\n"
-        "\t\t\t\tac_toplevel\t\t= ac_toplevel\n\n"
+        "! Pointcloud4Archicad - Parameter Script\n\n"
+        "! Ausdehnung der Punktwolke (Meter, aus dem Import) - nicht editierbar\n"
+        "A     = %.8g\n"
+        "B     = %.8g\n"
+        "ZZYZX = %.8g\n"
+        "parameters A = A, B = B, ZZYZX = ZZYZX,\n"
+        "           ac_bottomlevel = 0, ac_toplevel = ZZYZX\n"
         "lock \"A\", \"B\", \"ZZYZX\"\n"
-        "lock \"iDensityPercent\"\n"
-        "lock \"iTotalPoints\"\n"
-        "lock \"iScanCount\"\n\n"
-        "values \"lowerPlaneHeight\" range [ ,upperPlaneHeight)\n"
-        "values \"upperPlaneHeight\" range [lowerPlaneHeight ,)\n\n"
-        "if not(bOverrideCutplane) then\n"
+        "lock \"iDensityPercent\", \"iTotalPoints\", \"iScanCount\"\n\n"
+        "! Schnittebenen: obere immer ueber der unteren\n"
+        "values \"lowerPlaneHeight\" range [ , upperPlaneHeight)\n"
+        "values \"upperPlaneHeight\" range [lowerPlaneHeight, )\n"
+        "if not (bOverrideCutplane) then\n"
         "\tlock \"upperPlaneHeight\", \"lowerPlaneHeight\"\n"
-        "endif\n\n"
-        "values \"scaleX\" range (0, ]\n"
-        "values \"scaleY\" range (0, ]\n"
-        "values \"scaleZ\" range (0, ]\n\n"
-        "values{2} \"iModelUnit\"\tMODEL_UNIT_M,\t`Meter`,\n"
-        "\t\t\t\t\t\tMODEL_UNIT_CM,\t`Zentimeter`,\n"
-        "\t\t\t\t\t\tMODEL_UNIT_MM,\t`Millimeter`,\n"
-        "\t\t\t\t\t\tMODEL_UNIT_FT,\t`Fuss`,\n"
-        "\t\t\t\t\t\tMODEL_UNIT_IN,\t`Inch`\n\n"
-        "if not(bLinkScale) then\n"
-        "\tscaleRatioXY = scaleX / scaleY\n"
-        "\tparameters\tscaleRatioXY = scaleRatioXY\n\n"
-        "\tscaleRatioYZ = scaleY / scaleZ\n"
-        "\tparameters\tscaleRatioYZ = scaleRatioYZ\n\n"
-        "\tscaleRatioXZ = scaleX / scaleZ\n"
-        "\tparameters\tscaleRatioXZ = scaleRatioXZ\n"
-        "else\n"
-        "\tif\tGLOB_MODPAR_NAME = \"scaleX\" |\\\n"
-        "\t\tGLOB_MODPAR_NAME = \"scaleY\" |\\\n"
-        "\t\tGLOB_MODPAR_NAME = \"scaleZ\" then\n"
-        "\t\tif GLOB_MODPAR_NAME = \"scaleX\" then\n"
-        "\t\t\tscaleY\t= scaleX / scaleRatioXY\n"
-        "\t\t\tparameters\tscaleY = scaleY\n"
-        "\t\t\tscaleZ\t= scaleX / scaleRatioXZ\n"
-        "\t\t\tparameters\tscaleZ = scaleZ\n"
-        "\t\telse\n"
-        "\t\t\tif GLOB_MODPAR_NAME = \"scaleY\" then\n"
-        "\t\t\t\tscaleX\t= scaleY * scaleRatioXY\n"
-        "\t\t\t\tparameters\tscaleX = scaleX\n"
-        "\t\t\t\tscaleZ\t= scaleY / scaleRatioYZ\n"
-        "\t\t\t\tparameters\tscaleZ = scaleZ\n"
-        "\t\t\telse\n"
-        "\t\t\t\tscaleX\t= scaleZ * scaleRatioXZ\n"
-        "\t\t\t\tparameters\tscaleX = scaleX\n"
-        "\t\t\t\tscaleY\t= scaleZ * scaleRatioYZ\n"
-        "\t\t\t\tparameters\tscaleY = scaleY\n"
-        "\t\t\tendif\n"
-        "\t\tendif\n"
-        "\telse\n"
-        "\t\tscaleRatioXY = scaleX / scaleY\n"
-        "\t\tparameters\tscaleRatioXY = scaleRatioXY\n"
-        "\t\tscaleRatioYZ = scaleY / scaleZ\n"
-        "\t\tparameters\tscaleRatioYZ = scaleRatioYZ\n"
-        "\t\tscaleRatioXZ = scaleX / scaleZ\n"
-        "\t\tparameters\tscaleRatioXZ = scaleRatioXZ\n"
-        "\tendif\n"
-        "endif\n\n"
-        "scalingUnitX\t= scaleX * _scaleOriginalSize\n"
-        "scalingUnitY\t= scaleY * _scaleOriginalSize\n"
-        "scalingUnitZ\t= scaleZ * _scaleOriginalSize\n\n"
-        "parameters\tscalingUnitX\t= scalingUnitX,\n"
-        "\t\t\t\tscalingUnitY\t= scalingUnitY,\n"
-        "\t\t\t\tscalingUnitZ\t= scalingUnitZ\n",
+        "endif\n",
         (double)origX, (double)origY, (double)origZ);
     fprintf (f, "]]>\n</Script_VL>\n\n");
 
@@ -768,59 +663,24 @@ static bool WriteGsmViaXml (
         "\t</ParamSectHeader>\n"
         "\t<Parameters>\n");
 
-    fprintf (f, "\t\t<Length Name=\"A\"><Description><![CDATA[\"Dimension 1\"]]></Description>"
+    fprintf (f, "\t\t<Length Name=\"A\"><Description><![CDATA[\"Ausdehnung X\"]]></Description>"
                "<Fix/><Value>%.8g</Value></Length>\n", (double)origX);
-    fprintf (f, "\t\t<Length Name=\"B\"><Description><![CDATA[\"Dimension 2\"]]></Description>"
+    fprintf (f, "\t\t<Length Name=\"B\"><Description><![CDATA[\"Ausdehnung Y\"]]></Description>"
                "<Fix/><Value>%.8g</Value></Length>\n", (double)origY);
-    fprintf (f, "\t\t<Length Name=\"ZZYZX\"><Description><![CDATA[\"Height\"]]></Description>"
+    fprintf (f, "\t\t<Length Name=\"ZZYZX\"><Description><![CDATA[\"Ausdehnung Z\"]]></Description>"
                "<Fix/><Value>%.8g</Value></Length>\n", (double)origZ);
-    fprintf (f, "\t\t<Boolean Name=\"AC_show2DHotspotsIn3D\"><Description><![CDATA[\"Show 2D Hotspots in 3D\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>0</Value></Boolean>\n");
-    fprintf (f, "\t\t<Length Name=\"ac_bottomlevel\"><Description><![CDATA[\"Bottom Level\"]]></Description>"
+    fprintf (f, "\t\t<Length Name=\"ac_bottomlevel\"><Description><![CDATA[\"Unterkante\"]]></Description>"
                "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>0</Value></Length>\n");
-    fprintf (f, "\t\t<Length Name=\"ac_toplevel\"><Description><![CDATA[\"Top Level\"]]></Description>"
+    fprintf (f, "\t\t<Length Name=\"ac_toplevel\"><Description><![CDATA[\"Oberkante\"]]></Description>"
                "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%.8g</Value></Length>\n", (double)origZ);
-    fprintf (f, "\t\t<Boolean Name=\"bProject2D\"><Description><![CDATA[\"\"]]></Description>"
+    fprintf (f, "\t\t<Boolean Name=\"bProject2D\"><Description><![CDATA[\"Grundriss-Projektion aktiv\"]]></Description>"
                "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>0</Value></Boolean>\n");
-    fprintf (f, "\t\t<Title Name=\"tRep3D\"><Description><![CDATA[\"3D Representation\"]]></Description><Fix/></Title>\n");
-    fprintf (f, "\t\t<Integer Name=\"iModelUnit\"><Description><![CDATA[\"Basic Model Unit\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/></Flags><Value>1</Value></Integer>\n");
-    fprintf (f, "\t\t<RealNum Name=\"offsetX\"><Description><![CDATA[\"X Coordinate of The Point Cloud Origin\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/><ParFlg_Hidden/></Flags><Value>%.8g</Value></RealNum>\n", (double)offX);
-    fprintf (f, "\t\t<RealNum Name=\"offsetY\"><Description><![CDATA[\"Y Coordinate of The Point Cloud Origin\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/><ParFlg_Hidden/></Flags><Value>%.8g</Value></RealNum>\n", (double)offY);
-    fprintf (f, "\t\t<RealNum Name=\"offsetZ\"><Description><![CDATA[\"Z Coordinate of The Point Cloud Origin\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/><ParFlg_Hidden/></Flags><Value>%.8g</Value></RealNum>\n", (double)offZ);
-    fprintf (f, "\t\t<Length Name=\"scalingUnitX\"><Description><![CDATA[\"Scaling Unit Length X\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/><ParFlg_Hidden/></Flags><Value>1</Value></Length>\n");
-    fprintf (f, "\t\t<Length Name=\"scalingUnitY\"><Description><![CDATA[\"Scaling Unit Length Y\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/><ParFlg_Hidden/></Flags><Value>1</Value></Length>\n");
-    fprintf (f, "\t\t<Length Name=\"scalingUnitZ\"><Description><![CDATA[\"Scaling Unit Length Z\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/><ParFlg_Hidden/></Flags><Value>1</Value></Length>\n");
-    fprintf (f, "\t\t<Boolean Name=\"bLinkScale\"><Description><![CDATA[\"Link Scale\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/></Flags><Value>1</Value></Boolean>\n");
-    fprintf (f, "\t\t<RealNum Name=\"scaleX\"><Description><![CDATA[\"Scale of X Coordinate\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/></Flags><Value>1</Value></RealNum>\n");
-    fprintf (f, "\t\t<RealNum Name=\"scaleY\"><Description><![CDATA[\"Scale of Y Coordinate\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/></Flags><Value>1</Value></RealNum>\n");
-    fprintf (f, "\t\t<RealNum Name=\"scaleZ\"><Description><![CDATA[\"Scale of Z Coordinate\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/></Flags><Value>1</Value></RealNum>\n");
-    fprintf (f, "\t\t<RealNum Name=\"scaleRatioXY\"><Description><![CDATA[\"\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/><ParFlg_Hidden/></Flags><Value>1</Value></RealNum>\n");
-    fprintf (f, "\t\t<RealNum Name=\"scaleRatioXZ\"><Description><![CDATA[\"\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/><ParFlg_Hidden/></Flags><Value>1</Value></RealNum>\n");
-    fprintf (f, "\t\t<RealNum Name=\"scaleRatioYZ\"><Description><![CDATA[\"\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/><ParFlg_Hidden/></Flags><Value>1</Value></RealNum>\n");
-    fprintf (f, "\t\t<Boolean Name=\"bOverrideCutplane\"><Description><![CDATA[\"Override Floor Plan Cut Plane Height\"]]></Description>"
+    fprintf (f, "\t\t<Boolean Name=\"bOverrideCutplane\"><Description><![CDATA[\"Eigene Schnittebenen im Grundriss\"]]></Description>"
                "<Fix/><Flags><ParFlg_BoldName/></Flags><Value>0</Value></Boolean>\n");
-    fprintf (f, "\t\t<Length Name=\"upperPlaneHeight\"><Description><![CDATA[\"Upper Cutplane Height to Current Story\"]]></Description>"
+    fprintf (f, "\t\t<Length Name=\"upperPlaneHeight\"><Description><![CDATA[\"Obere Schnittebene (zum Geschoss)\"]]></Description>"
                "<Fix/><Flags><ParFlg_Child/></Flags><Value>1.1</Value></Length>\n");
-    fprintf (f, "\t\t<Length Name=\"tempUpperPlaneHeight\"><Description><![CDATA[\"\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/><ParFlg_Hidden/></Flags><Value>1.1</Value></Length>\n");
-    fprintf (f, "\t\t<Length Name=\"lowerPlaneHeight\"><Description><![CDATA[\"Lower Cutplane Height to Current Story\"]]></Description>"
+    fprintf (f, "\t\t<Length Name=\"lowerPlaneHeight\"><Description><![CDATA[\"Untere Schnittebene (zum Geschoss)\"]]></Description>"
                "<Fix/><Flags><ParFlg_Child/></Flags><Value>0</Value></Length>\n");
-    fprintf (f, "\t\t<Length Name=\"tempLowerPlaneHeight\"><Description><![CDATA[\"\"]]></Description>"
-               "<Fix/><Flags><ParFlg_Child/><ParFlg_Hidden/></Flags><Value>0</Value></Length>\n");
     fprintf (f, "\t\t<Boolean Name=\"bVisible\"><Description><![CDATA[\"Punktwolke anzeigen\"]]></Description>"
                "<Fix/><Value>1</Value></Boolean>\n");
     fprintf (f, "\t\t<Boolean Name=\"bShowNumbers\"><Description><![CDATA[\"Standortnummern anzeigen\"]]></Description>"
