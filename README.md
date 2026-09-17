@@ -51,7 +51,13 @@ zur E57 steht im Objekt (`sE57Path`) — daran erkennt die Palette ihre Objekte.
 | 26, 27, 28, 29 | ✅ | ✅ |
 
 Apple Silicon: das Add-on wird derzeit nur als x86_64 gebaut (Xerces-C aus
-Homebrew ist Intel-only) und läuft unter Rosetta zusammen mit Archicad.
+Homebrew ist Intel-only). Es läuft nur, wenn auch Archicad unter Rosetta
+(Intel) gestartet wird — ein nativ laufendes Archicad lädt es nicht.
+
+Das fertige Bundle hat keine Abhängigkeit zu Homebrew: Xerces-C ist statisch
+eingebettet. **Bundles als ZIP weitergeben** (z. B. `ditto -c -k --keepParent`),
+nicht als loser Ordner über Cloud-Sync — dabei gehen Execute-Bits verloren und
+Archicad lädt das Add-on stillschweigend nicht.
 
 Die GDL-Objekte selbst sind versionsunabhängig.
 
