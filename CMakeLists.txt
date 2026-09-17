@@ -13,6 +13,24 @@ endif ()
 # libE57Format — E57-Reader (automatisch heruntergeladen beim Konfigurieren)
 # ---------------------------------------------------------------------------
 include (FetchContent)
+
+# macOS: Xerces-C statisch einbinden. Sonst hängt das Bundle an
+# /usr/local/opt/xerces-c/lib/libxerces-c-3.3.dylib (Homebrew) und lädt auf
+# jedem Rechner ohne Homebrew-Xerces nicht — ohne Fehlermeldung.
+# Windows löst das über das vcpkg-Triplet x64-windows-static-md.
+if (NOT WIN32)
+	find_library (XercesC_STATIC_LIB
+		NAMES libxerces-c.a
+		PATHS /usr/local/opt/xerces-c/lib /opt/homebrew/opt/xerces-c/lib
+		NO_DEFAULT_PATH)
+	if (XercesC_STATIC_LIB)
+		set (XercesC_LIBRARY "${XercesC_STATIC_LIB}" CACHE FILEPATH "Xerces-C static library" FORCE)
+		message (STATUS "Xerces-C statisch: ${XercesC_STATIC_LIB}")
+	else ()
+		message (WARNING "libxerces-c.a nicht gefunden — Bundle wird dynamisch gegen Homebrew-Xerces gelinkt und läuft nur auf Rechnern mit Homebrew-Xerces")
+	endif ()
+endif ()
+
 FetchContent_Declare (
 	libE57Format
 	GIT_REPOSITORY https://github.com/asmaloney/libE57Format.git
@@ -99,7 +117,7 @@ else ()
 	     CACHE PATH "ArchiCAD API DevKit directory")
 endif ()
 set (AC_ADDON_LANGUAGE "INT" CACHE STRING "Add-On language code")
-set (PW_VERSION "0.3.0" CACHE STRING "PointCloud Add-On version string")
+set (PW_VERSION "0.3.1" CACHE STRING "PointCloud Add-On version string")
 
 # Detect ArchiCAD version from DevKit headers, append to addon name
 set (ACAPINC "${AC_API_DEVKIT_DIR}/Support/Inc/ACAPinc.h")
@@ -278,10 +296,13 @@ else ()
 	else ()
 		set (ACAP_STAT_LIB "${AC_API_DEVKIT_DIR}/Support/Lib/libACAP_STAT.a")
 	endif ()
+	# curl: vom statischen Xerces-C (CurlURLInputStream) referenziert; System-Lib von macOS
+	find_library (CurlLibrary curl)
 	target_link_libraries (AddOn
 		"${ACAP_STAT_LIB}"
 		${CocoaFramework}
-		E57Format)
+		E57Format
+		${CurlLibrary})
 endif ()
 
 SetCompilerOptions (AddOn)
