@@ -1,29 +1,19 @@
 /* Localizable strings for Pointcloud4Archicad Add-On */
 
-'GDLG' 32400  Palette | topCaption | close | grow    0    0  354  218  "Punktwolken"  {
-/* [  1] */ LeftText        5    3  320   14  LargePlain  "Punktwolken"
-/* [  2] */ Button          5   20   52   22  LargePlain  "+..."
-/* [  3] */ PosIntEdit     63   20   40   20  LargePlain  "1"  "100"
-/* [  4] */ LeftText      106   24   18   16  LargePlain  "%"
-/* [  5] */ IconButton    328   19   22   22  32401
-/* [  6] */ SingleSelList   5   48  344  132  LargePlain  PartialItems  VScroll  20
-/* [  7] */ IconButton      5  188   22   22  32402
-/* [  8] */ PosIntEdit     33  188   40   18  LargePlain  "1"  "100"
-/* [  9] */ LeftText       76  192   15   14  LargePlain  "%"
-/* [ 10] */ RightText      95  192  250   14  SmallPlain  "v1.1"
+'GDLG' 32400  Palette | topCaption | close | grow    0    0  354  500  "Punktwolken"  {
+/* [  1] */ PosIntEdit          8    8   50   22  LargePlain  "1"  "100"
+/* [  2] */ LeftText           62   12   18   16  LargePlain  "%"
+/* [  3] */ PopupControl        8   38  338   22  80  1
+/* [  4] */ SingleSelTreeView   8   68  338  406  LargePlain  16  16  16  16  noLabelEdit  noDragDrop  16
+/* [  5] */ RightText          96  480  250   14  SmallPlain  "v1.1"
 }
 
 'DLGH' 32400  DLG_32400_PUNKTWOLKEN {
-1  ""  Label_header
-2  ""  Button_add
-3  ""  IntEdit_defDens
-4  ""  Label_defDens
-5  ""  IconButton_del
-6  ""  ListBox_clouds
-7  ""  IconButton_reload
-8  ""  IntEdit_selDens
-9  ""  Label_selDens
-10 ""  Label_version
+1  ""  IntEdit_density
+2  ""  Label_percent
+3  ""  PopUp_clouds
+4  ""  TreeView_clouds
+5  ""  Label_version
 }
 
 'STR#' 32000 "Add-on Name and Description" {

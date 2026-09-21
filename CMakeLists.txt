@@ -290,6 +290,7 @@ if (WIN32)
 		advapi32)
 else ()
 	find_library (CocoaFramework Cocoa)
+	find_library (ImageIOFramework ImageIO)     # HoverIconButton: Icon-TIF laden
 	# AC26: Lib/Mactel/  |  AC27+: Lib/ directly
 	if (EXISTS "${AC_API_DEVKIT_DIR}/Support/Lib/Mactel/libACAP_STAT.a")
 		set (ACAP_STAT_LIB "${AC_API_DEVKIT_DIR}/Support/Lib/Mactel/libACAP_STAT.a")
@@ -301,6 +302,7 @@ else ()
 	target_link_libraries (AddOn
 		"${ACAP_STAT_LIB}"
 		${CocoaFramework}
+		${ImageIOFramework}
 		E57Format
 		${CurlLibrary})
 endif ()

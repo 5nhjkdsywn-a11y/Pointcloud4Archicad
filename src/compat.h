@@ -39,6 +39,16 @@ inline GSErrCode Compat_ReloadLibraries ()
     { return ACAPI_ProjectOperation_ReloadLibraries (); }
 inline GSErrCode Compat_GetStorySettings (API_StoryInfo* info)
     { return ACAPI_ProjectSetting_GetStorySettings (info); }
+inline GSErrCode Compat_Select (const GS::Array<API_Neig>& neigs, bool add)
+    { return ACAPI_Selection_Select (neigs, add); }
+inline GSErrCode Compat_RegisterSupportedService (GSType cmdID, Int32 ver)
+    { return ACAPI_AddOnAddOnCommunication_RegisterSupportedService (cmdID, ver); }
+inline GSErrCode Compat_InstallModulCommandHandler (GSType cmdID, Int32 ver, APIModulCommandProc* proc)
+    { return ACAPI_AddOnIntegration_InstallModulCommandHandler (cmdID, ver, proc); }
+inline GSErrCode Compat_CallFromEventLoop (const API_ModulID* mdid, GSType cmdID, Int32 ver)
+    { return ACAPI_AddOnAddOnCommunication_CallFromEventLoop (mdid, cmdID, ver, nullptr, false, nullptr); }
+inline GSErrCode Compat_DeselectAll ()
+    { return ACAPI_Selection_DeselectAll (); }
 
 // ── LibPart parameters (formerly ACAPI_Goodies) ───────────────────────────
 inline GSErrCode Compat_OpenParameters (API_ParamOwnerType* owner)
@@ -98,6 +108,16 @@ inline GSErrCode Compat_ReloadLibraries ()
     { return ACAPI_Automate (APIDo_ReloadLibrariesID, nullptr, nullptr); }
 inline GSErrCode Compat_GetStorySettings (API_StoryInfo* info)
     { return ACAPI_Environment (APIEnv_GetStorySettingsID, info, nullptr); }
+inline GSErrCode Compat_Select (const GS::Array<API_Neig>& neigs, bool add)
+    { return ACAPI_Element_Select (neigs, add); }
+inline GSErrCode Compat_RegisterSupportedService (GSType cmdID, Int32 ver)
+    { return ACAPI_Register_SupportedService (cmdID, ver); }
+inline GSErrCode Compat_InstallModulCommandHandler (GSType cmdID, Int32 ver, APIModulCommandProc* proc)
+    { return ACAPI_Install_ModulCommandHandler (cmdID, ver, proc); }
+inline GSErrCode Compat_CallFromEventLoop (const API_ModulID* mdid, GSType cmdID, Int32 ver)
+    { return ACAPI_Command_CallFromEventLoop (mdid, cmdID, ver, nullptr, false, nullptr); }
+inline GSErrCode Compat_DeselectAll ()
+    { return ACAPI_Element_DeselectAll (); }
 
 // ── LibPart parameters ────────────────────────────────────────────────────
 inline GSErrCode Compat_OpenParameters (API_ParamOwnerType* owner)

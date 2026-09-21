@@ -10,6 +10,8 @@
 #include "APIEnvir.h"
 #include "compat.h"
 
+#include <vector>
+
 // --- Version-String ----------------------------------------------------------
 
 #ifdef _WIN32
@@ -60,5 +62,33 @@ GS::UniString               DoImport            (int densityPct,
 bool                        TryDeleteEntry      (const PointCloudEntry& entry);
 void                        AutoPlaceEntry      (const PointCloudEntry& entry);
 bool                        HasPlacedInstances  (Int32 libIndex);
+API_Guid                    FirstPlacedInstance (Int32 libIndex);   // APINULLGuid wenn keine
+
+// --- Sichtbarkeitszustand einer platzierten Punktwolke -----------------------
+// Gelesen aus der ersten platzierten Instanz; Schreiben trifft alle Instanzen.
+
+struct StoryEntry {
+    short           index;      // Geschossnummer (wie im Navigator)
+    double          level;      // Unterkante (Projekt-Nullpunkt)
+    GS::UniString   name;
+};
+
+struct CloudState {
+    int                 scanCount = 0;
+    std::vector<double> zScan;      // Scanner-Hoehe je Standort (Weltkoordinaten)
+    std::vector<bool>   bScan;      // Standort sichtbar
+    std::vector<bool>   bGroup;     // [0] = unter Unterkante, [j] = Geschoss j (1-basiert aufsteigend)
+};
+
+std::vector<StoryEntry>     GetStoriesAscending ();
+bool                        ReadCloudState      (Int32 libIndex, CloudState& out);
+bool                        WriteCloudVisibility (Int32 libIndex, const CloudState& st);
+int                         StoryIndexOfScan    (double zScan, const std::vector<StoryEntry>& stories); // 0 = unter Unterkante
+bool                        OpenSettingsDialog  (Int32 libIndex);   // selektiert + oeffnet den Dialog aus dem Event-Loop
+
+// Add-on-Befehl, ueber den der Dialog verzoegert geoeffnet wird (AddOnMain registriert ihn)
+#define kCmdOpenSettings    'PCSD'
+#define kCmdOpenSettingsVer 1
+GSErrCode __ACENV_CALL      OpenSettingsDialogCommand (GSHandle params, GSPtr resultData, bool silentMode);
 
 #endif // E57IMPORTER_HPP

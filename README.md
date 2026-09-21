@@ -9,26 +9,26 @@ documentation.*
 
 ## Was es tut
 
-- **Import** einer `.e57`-Datei mit wählbarer Punktdichte (1–100 %). Pro
-  Scan-Standort entsteht eine eigene `.gspc`-Datei (Archicads natives
-  Punktwolkenformat), dazu ein GDL-Objekt (`.gsm`), das automatisch als
-  Bibliothek eingebunden und im aktuellen Geschoss platziert wird.
-- **Standorte ein-/ausblenden**: Im Objekt-Dialog lassen sich einzelne
-  Scan-Standorte oder ganze Geschosse abschalten. Die Zuordnung Standort →
-  Geschoss wird zur Laufzeit aus den Projektgeschossen berechnet und bleibt
-  nach Geschossänderungen korrekt.
+- **Import** einer `.e57`-Datei mit wählbarer Punktdichte (1–100 %, Feld oben
+  links, dann ➕). Pro Scan-Standort entsteht eine eigene `.gspc`-Datei
+  (Archicads natives Punktwolkenformat), dazu ein GDL-Objekt (`.gsm`), das
+  automatisch als Bibliothek eingebunden und im aktuellen Geschoss platziert
+  wird. Dieselbe E57 erneut wählen = Neuimport mit anderer Dichte; das Objekt
+  behält seine GUID, platzierte Instanzen bleiben erhalten.
+- **Palette**: Dropdown aller importierten Punktwolken („Name – Dichte"),
+  darunter ein Baum mit den Geschossen des Projekts und den Scan-Standorten
+  darin. Das Auge vor jedem Eintrag blendet Geschoss oder Standort ein/aus —
+  in allen platzierten Instanzen, rückgängig-fähig. Die Zuordnung Standort →
+  Geschoss wird live aus den Projektgeschossen berechnet.
+- **Einstellungen**-Button öffnet den Objekt-Einstellungsdialog der Punktwolke;
+  **✕** löscht Objekt, erzeugte Dateien und Bibliothekseintrag (E57 bleibt).
 - **Standortnummern** als 3D-Text an den Scanner-Positionen.
 - **Grundriss-Ausschnitt**: Die Wolke wird im Grundriss an der
   Geschoss-Schnittebene geschnitten; optional mit eigenen Höhen, optional auch
   im 3D-Fenster.
-- **Dichte nachträglich ändern** (Reload in der Palette) — die E57 wird erneut
-  gelesen, das Objekt behält seine GUID, platzierte Instanzen bleiben erhalten.
-- **Löschen** entfernt platzierte Objekte, die erzeugten Dateien und den
-  Bibliothekseintrag. Die E57-Quelldatei bleibt unangetastet.
 
 Bedienung über eine dockbare Palette: **Planung → Punktwolken-Palette…**
-
-![Objekt-Dialog und Palette in Archicad 26](docs/screenshot.png)
+Alle Icons stammen aus Archicads eigenen Ressourcen.
 
 ## Dateien, die der Import erzeugt
 
@@ -116,7 +116,8 @@ sobald beide installiert sind. Bitte eine eigene MDID registrieren
 
 ```
 src/AddOnMain.cpp           Registrierung, Menü, Lebenszyklus
-src/PunktwolkenPalette.*    dockbare DG::Palette
+src/PunktwolkenPalette.*    dockbare DG::Palette (Icon-Leiste als ListView, Dropdown, Geschoss-Baum)
+src/ToolIcon.*              Icon-Bitmaps (normal/hover) aus Archicads Ressourcen
 src/E57Importer.*           E57 → GSPC, GSM-Erzeugung (XML → LP_XMLConverter), Bibliotheksverwaltung
 src/compat.h                API-Unterschiede AC26 ↔ AC27+ in einer Datei
 RINT/, RFIX/, RFIX.mac/, RFIX.win/   Ressourcen (Dialog, Strings, MDID, Icons, plist)

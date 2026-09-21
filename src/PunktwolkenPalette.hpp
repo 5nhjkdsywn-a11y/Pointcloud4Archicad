@@ -1,5 +1,9 @@
 // *****************************************************************************
 // PunktwolkenPalette — dockbare Palette zur Punktwolken-Verwaltung
+//
+//   [ 10 % ] (+) (Einstellungen) (x)
+//   [ Dropdown: Punktwolke – 10% ▾ ]
+//   Baum: Punktwolke → Geschosse → Geschoss (Auge) → Standorte (Auge)
 // *****************************************************************************
 
 #ifndef PUNKTWOLKENPALETTE_HPP
@@ -9,13 +13,18 @@
 #include "ACAPinc.h"
 #include "compat.h"
 #include "E57Importer.hpp"
+#include "ToolIcon.hpp"
 
 #include "DGDLLExport.h"
 #include "DGDialog.hpp"
 #include "DGButton.hpp"
 #include "DGEditControl.hpp"
 #include "DGStaticItem.hpp"
-#include "DGListBox.hpp"
+#include "DGPopUp.hpp"
+#include "DGTreeView.hpp"
+#include "DGListView.hpp"
+
+#include <vector>
 
 // --- Ressource-IDs -----------------------------------------------------------
 
@@ -25,16 +34,12 @@
 // --- Item-IDs (entsprechen GDLG 32400) --------------------------------------
 
 enum PalItemId {
-    kHeaderLabelId  = 1,
-    kAddBtnId       = 2,
-    kDefDensEditId  = 3,
-    kDefDensLabelId = 4,
-    kDelBtnId       = 5,
-    kListBoxId      = 6,
-    kRelBtnId       = 7,
-    kSelDensEditId  = 8,
-    kSelDensLabelId = 9,
-    kVersionLabelId = 10
+    kDensEditId     = 1,
+    kDensLabelId    = 2,
+    kCloudPopUpId   = 3,
+    kTreeId         = 4,
+    kVersionLabelId = 5
+    // Die drei Icon-Buttons werden programmatisch erzeugt (flach, ohne Rahmen)
 };
 
 // --- PunktwolkenPalette ------------------------------------------------------
@@ -42,8 +47,9 @@ enum PalItemId {
 class PunktwolkenPalette final
     : public DG::Palette
     , public DG::PanelObserver
-    , public DG::ButtonItemObserver
-    , public DG::ListBoxObserver
+    , public DG::PopUpObserver
+    , public DG::TreeViewObserver
+    , public DG::ListViewObserver
 {
 public:
     static bool                     HasInstance     ();
@@ -60,35 +66,65 @@ public:
 private:
     PunktwolkenPalette ();
 
-    void    UpdateFooter ();
+    enum ToolItem { kToolAdd = 1, kToolSettings = 2, kToolDelete = 3 };
+
+    // Baum-Knoten: was steckt hinter einem Tree-Item
+    enum NodeKind { kNodeCloud, kNodeStoriesFolder, kNodeStory, kNodeScan };
+    struct Node {
+        Int32       tvItem;
+        NodeKind    kind;
+        int         index;      // Story: bGroup-Index (0 = unter Unterkante); Scan: 0-basiert
+    };
+
+    void    RebuildTree   ();
+    void    UpdateEyes    ();   // nur Status-Icons nachfuehren, Aufklapp-Zustand bleibt
+    void    SetEye        (Int32 tvItem, bool visible);
+    const Node* FindNode  (Int32 tvItem) const;
+    int     SelectedCloud () const;    // Index in entries, -1 = keine
 
     // DG::PanelObserver
     virtual void PanelOpened             (const DG::PanelOpenEvent& ev)                              override;
     virtual void PanelResized            (const DG::PanelResizeEvent& ev)                            override;
+    // DG::ListViewObserver (Icon-Leiste)
+    virtual bool ListViewSelectionChangeRequested (const DG::ListViewMouseDownEvent& ev)         override;
+    virtual void ListViewMouseDown       (const DG::ListViewMouseDownEvent& ev, bool* processed)  override;
+    virtual void ListViewHoverStarted    (const DG::ListViewHoverEvent& ev)                       override;
+    virtual void ListViewHoverEnded      (const DG::ListViewHoverEvent& ev)                       override;
+    void    SetToolEnabled (ToolItem item, bool enabled);
     virtual void PanelCloseRequested     (const DG::PanelCloseRequestEvent& ev, bool* accepted)      override;
 
-    // DG::ListBoxObserver
-    virtual void ListBoxSelectionChanged (const DG::ListBoxSelectionEvent& ev)                       override;
+    void    OnAdd ();
+    void    OnSettings ();
+    void    OnDelete ();
 
-    // DG::ButtonItemObserver
-    virtual void ButtonClicked           (const DG::ButtonClickEvent& ev)                            override;
+    // DG::PopUpObserver
+    virtual void PopUpChanged            (const DG::PopUpChangeEvent& ev)                            override;
+
+    // DG::TreeViewObserver
+    virtual void TreeViewItemClicked     (const DG::TreeViewItemClickEvent& ev, bool* denySelectionChange) override;
 
     // Palette-Callback
     static GSErrCode __ACENV_CALL PaletteControlCallBack (Int32, API_PaletteMessageID, GS::IntPtr);
 
     // Items
-    DG::LeftText            headerLabel;
-    DG::Button              addBtn;
-    DG::IntEdit             defDensEdit;
-    DG::LeftText            defDensLabel;
-    DG::IconButton          delBtn;
-    DG::SingleSelListBox    listBox;
-    DG::IconButton          relBtn;
-    DG::IntEdit             selDensEdit;
-    DG::LeftText            selDensLabel;
+    DG::IntEdit             densEdit;
+    DG::LeftText            densLabel;
+    // Icon-Leiste wie in ArchiCADs Paletten: ListView mit drei Icon-Items
+    // (rahmenlos, eingebautes Hover, Click-through auf inaktive Palette)
+    DG::SingleSelListView   toolbar;
+    DG::Icon                toolIcons[4], toolHoverIcons[4];
+    bool                    toolEnabled[4] = { true, true, true, true };
+    DG::PopUp               cloudPopUp;
+    DG::SingleSelTreeView   tree;
     DG::RightText           versionLabel;
 
+    // Icons aus ArchiCADs eigenen Ressourcen
+    DG::Icon                iconEyeOpen, iconEyeClosed, iconStory, iconScan, iconCloud;
+
     GS::Array<PointCloudEntry>  entries;
+    std::vector<Node>           nodes;
+    CloudState                  state;
+    std::vector<StoryEntry>     stories;
     int                         defaultDensity  = 10;
     bool                        importing       = false;
 

@@ -3,10 +3,22 @@
 // *****************************************************************************
 
 #include "PunktwolkenPalette.hpp"
+#include "RS.hpp"
 #include <string>
 
 static const GS::Guid paletteGuid ("{C7D4E5F6-1A2B-3C4D-8E9F-0A1B2C3D4E5F}");
-static const int      PAL_W = 354;
+
+// Icon-IDs aus ArchiCADs eigenem Ressourcenmodul (Archicad 26.app/Contents/Resources/<id>.tif)
+enum ArchicadIconId {
+    kIcoEyeOpen   = 10015,
+    kIcoEyeClosed = 10016,
+    kIcoStory     = 12750,
+    kIcoScan      = 12411,   // Vermessungspunkt (grau) — Scanner-Standort
+    kIcoCloud     =  9900,
+    kIcoAdd       = 29531,   // Plus im Kreis (Vorgabe Torben)
+    kIcoSettings  = 12382,   // Einstellungen-Liste (Vorgabe Torben; 24837 zeigte zur Laufzeit ein anderes Bild)
+    kIcoDelete    = 28346
+};
 
 GS::Ref<PunktwolkenPalette> PunktwolkenPalette::instance;
 
@@ -18,45 +30,66 @@ static GSErrCode NotificationHandler (API_NotifyEventID notifID, Int32 /*param*/
     return NoError;
 }
 
+static GS::UniString CloudLabel (const PointCloudEntry& e)
+{
+    return e.name + GS::UniString (" - ")
+         + GS::UniString (std::to_string (e.densityPercent).c_str ())
+         + GS::UniString ("%");
+}
+
 // --- Konstruktor / Destruktor -------------------------------------------------
 
 PunktwolkenPalette::PunktwolkenPalette () :
     DG::Palette (ACAPI_GetOwnResModule (), 32400, ACAPI_GetOwnResModule (), paletteGuid),
-    headerLabel  (GetReference (), kHeaderLabelId),
-    addBtn       (GetReference (), kAddBtnId),
-    defDensEdit  (GetReference (), kDefDensEditId),
-    defDensLabel (GetReference (), kDefDensLabelId),
-    delBtn       (GetReference (), kDelBtnId),
-    listBox      (GetReference (), kListBoxId),
-    relBtn       (GetReference (), kRelBtnId),
-    selDensEdit  (GetReference (), kSelDensEditId),
-    selDensLabel (GetReference (), kSelDensLabelId),
-    versionLabel (GetReference (), kVersionLabelId)
+    densEdit     (GetReference (), kDensEditId),
+    densLabel    (GetReference (), kDensLabelId),
+    toolbar      (GetReference (), DG::Rect (86, 5, 190, 33), DG::ListView::BottomText,
+                  DG::ListView::HideScrollBar, DG::ListView::NoFrame),
+    cloudPopUp   (GetReference (), kCloudPopUpId),
+    tree         (GetReference (), kTreeId),
+    versionLabel (GetReference (), kVersionLabelId),
+    iconEyeOpen   (RSGetApplicationResModule (), kIcoEyeOpen),
+    iconEyeClosed (RSGetApplicationResModule (), kIcoEyeClosed),
+    iconStory     (RSGetApplicationResModule (), kIcoStory),
+    iconScan      (RSGetApplicationResModule (), kIcoScan),
+    iconCloud     (RSGetApplicationResModule (), kIcoCloud)
 {
     ACAPI_ProjectOperation_CatchProjectEvent (APINotify_Quit, NotificationHandler);
 
-    defDensEdit.SetMin (1); defDensEdit.SetMax (100);
-    defDensEdit.SetValue (defaultDensity);
+    // Icon-Leiste aufbauen
+    {
+        const short ids[4] = { 0, kIcoAdd, kIcoSettings, kIcoDelete };
+        toolbar.SetItemSize (32, 28);
+        toolbar.SetImageSize (24, 24);
+        for (int i = 1; i <= 3; ++i) {
+            // beide Varianten als 24x24-Bitmap, damit die ListView nichts skaliert
+            toolIcons[i]      = ToolIcon::Make (RSGetApplicationResModule (), ids[i], 24, 24, false);
+            toolHoverIcons[i] = ToolIcon::Make (RSGetApplicationResModule (), ids[i], 24, 24, true);
+            if (!toolIcons[i].IsValid ()) toolIcons[i] = DG::Icon (RSGetApplicationResModule (), ids[i]);
+            toolbar.AppendItem ();
+            toolbar.SetItemText ((short)i, GS::UniString ());
+            toolbar.SetItemImage ((short)i, DG::ListView::Icon, toolIcons[i]);
+        }
+        // Hintergrund: ListView kennt nur Weiss / ButtonFace, eine eigene Farbe wird ignoriert
+        // (auch DGSetItemBackgroundColor). ButtonFace ist etwas heller als die Palette — akzeptiert.
+        toolbar.SetBackground (DG::ListView::BGButtonFace);
+        toolbar.EnableHoverEvent ();
+        toolbar.SetHoverInWaitMillisecs (0);
+        toolbar.Show ();
+    }
 
-    listBox.SetTabFieldCount (1);
-    listBox.SetTabFieldBeginEndPosition (1, 0, PAL_W - 15);
+    densEdit.SetMin (1); densEdit.SetMax (100);
+    densEdit.SetValue (defaultDensity);
 
-    selDensEdit.SetMin (1); selDensEdit.SetMax (100);
-    selDensEdit.SetValue (25);
 
     versionLabel.SetText (GS::UniString (kVersionStr));
 
-    SetMinClientSize (100, 150);
+    SetMinClientSize (200, 200);
 
-    Attach      (*this);
-    addBtn.Attach  (*this);
-    relBtn.Attach  (*this);
-    delBtn.Attach  (*this);
-    listBox.Attach (*this);
-
-    relBtn.Disable ();
-    selDensEdit.Disable ();
-    delBtn.Disable ();
+    Attach            (*this);
+    toolbar.Attach    (*this);
+    cloudPopUp.Attach (*this);
+    tree.Attach       (*this);
 
     BeginEventProcessing ();
 }
@@ -64,11 +97,10 @@ PunktwolkenPalette::PunktwolkenPalette () :
 PunktwolkenPalette::~PunktwolkenPalette ()
 {
     EndEventProcessing ();
-    listBox.Detach (*this);
-    Detach         (*this);
-    addBtn.Detach  (*this);
-    relBtn.Detach  (*this);
-    delBtn.Detach  (*this);
+    tree.Detach       (*this);
+    toolbar.Detach    (*this);
+    cloudPopUp.Detach (*this);
+    Detach            (*this);
 }
 
 // --- Singleton-Verwaltung ----------------------------------------------------
@@ -96,41 +128,176 @@ void PunktwolkenPalette::DestroyInstance ()
     instance = nullptr;
 }
 
-// --- Refresh -----------------------------------------------------------------
+// --- Refresh: Liste der Punktwolken neu lesen, Auswahl erhalten ---------------
 
 void PunktwolkenPalette::Refresh ()
 {
+    GS::UniString keepName;
+    int sel = SelectedCloud ();
+    if (sel >= 0) keepName = entries[sel].name;
+
     entries = CollectOurLibParts ();
 
-    listBox.DeleteItem (DG::ListBox::AllItems);
-    for (int i = 0; i < (int)entries.GetSize (); ++i) {
-        const PointCloudEntry& e = entries[i];
-        GS::UniString text = e.name
-            + GS::UniString (" - ")
-            + GS::UniString (std::to_string (e.densityPercent).c_str ())
-            + GS::UniString ("%");
-        listBox.AppendItem ();
-        listBox.SetTabItemText ((short)(i + 1), 1, text);
+    cloudPopUp.DeleteItem (DG::PopUp::AllItems);
+    short selectItem = 0;
+    for (UInt32 i = 0; i < entries.GetSize (); ++i) {
+        cloudPopUp.AppendItem ();
+        cloudPopUp.SetItemText ((short)(i + 1), CloudLabel (entries[i]));
+        if (entries[i].name == keepName) selectItem = (short)(i + 1);
     }
+    if (selectItem == 0 && entries.GetSize () > 0) selectItem = 1;
+    if (selectItem > 0) cloudPopUp.SelectItem (selectItem);
 
-    UpdateFooter ();
+    bool any = entries.GetSize () > 0;
+    if (any) cloudPopUp.Enable (); else cloudPopUp.Disable ();
+    SetToolEnabled (kToolSettings, any);
+    SetToolEnabled (kToolDelete, any);
+
+    RebuildTree ();
 }
 
-// --- UpdateFooter ------------------------------------------------------------
-
-void PunktwolkenPalette::UpdateFooter ()
+int PunktwolkenPalette::SelectedCloud () const
 {
-    short sel = listBox.GetSelectedItem ();
+    short s = cloudPopUp.GetSelectedItem ();
+    if (s < 1 || s > (short)entries.GetSize ()) return -1;
+    return (int)s - 1;
+}
 
-    if (sel > 0 && sel <= (short)entries.GetSize ()) {
-        selDensEdit.SetValue (entries[(int)sel - 1].densityPercent);
-        relBtn.Enable ();
-        selDensEdit.Enable ();
-        delBtn.Enable ();
-    } else {
-        relBtn.Disable ();
-        selDensEdit.Disable ();
-        delBtn.Disable ();
+const PunktwolkenPalette::Node* PunktwolkenPalette::FindNode (Int32 tvItem) const
+{
+    for (const Node& n : nodes)
+        if (n.tvItem == tvItem) return &n;
+    return nullptr;
+}
+
+// --- Baum aufbauen -----------------------------------------------------------
+
+void PunktwolkenPalette::RebuildTree ()
+{
+    tree.DisableDraw ();
+    tree.DeleteItem (DG::TreeView::AllItems);
+    nodes.clear ();
+
+    int sel = SelectedCloud ();
+    if (sel < 0) { tree.EnableDraw (); return; }
+    const PointCloudEntry& e = entries[sel];
+
+    stories = GetStoriesAscending ();
+    bool hasState = ReadCloudState (e.libIndex, state);
+
+    // bGroup ggf. auf Geschossanzahl + 1 auffuellen (GDL macht das beim naechsten Lauf ebenso)
+    while (hasState && state.bGroup.size () < stories.size () + 1)
+        state.bGroup.push_back (true);
+    while (hasState && state.bScan.size () < (size_t)state.scanCount)
+        state.bScan.push_back (true);
+
+    Int32 rootItem = tree.InsertItem (DG::TreeView::RootItem, DG::TreeView::BottomItem);
+    tree.SetItemText (rootItem, CloudLabel (e));
+    tree.SetItemNormalIcon (rootItem, iconCloud);
+    nodes.push_back ({rootItem, kNodeCloud, sel});
+
+    if (!hasState) {
+        Int32 hint = tree.InsertItem (rootItem, DG::TreeView::BottomItem);
+        tree.SetItemText (hint, GS::UniString ("(nicht platziert)"));
+        tree.ExpandItem (rootItem);
+        tree.EnableDraw ();
+        return;
+    }
+
+    Int32 folder = tree.InsertItem (rootItem, DG::TreeView::BottomItem);
+    tree.SetItemText (folder, GS::UniString ("Geschosse"));
+    tree.SetItemNormalIcon (folder, iconStory);
+    nodes.push_back ({folder, kNodeStoriesFolder, -1});
+
+    // Gruppe "alle": Auge offen, wenn irgendein Geschoss sichtbar
+    bool anyVisible = false;
+    for (bool b : state.bGroup) anyVisible = anyVisible || b;
+    tree.SetItemStateIcon (folder, anyVisible ? iconEyeOpen : iconEyeClosed);
+
+    // Geschosse absteigend (oberstes zuerst), danach "Unter Unterkante"
+    auto addStory = [&] (int bgIdx, const GS::UniString& label, bool bold) {
+        Int32 it = tree.InsertItem (folder, DG::TreeView::BottomItem);
+        tree.SetItemText (it, label);
+        tree.SetItemNormalIcon (it, iconStory);
+        tree.SetItemStateIcon (it, state.bGroup[bgIdx] ? iconEyeOpen : iconEyeClosed);
+        if (bold) tree.SetItemFontStyle (it, DG::Font::Bold);
+        nodes.push_back ({it, kNodeStory, bgIdx});
+
+        for (int i = 0; i < state.scanCount; ++i) {
+            double z = i < (int)state.zScan.size () ? state.zScan[i] : 0.0;
+            if (StoryIndexOfScan (z, stories) != bgIdx) continue;
+            Int32 sc = tree.InsertItem (it, DG::TreeView::BottomItem);
+            tree.SetItemText (sc, GS::UniString ("Standort ") + GS::UniString (std::to_string (i + 1).c_str ()));
+            tree.SetItemNormalIcon (sc, iconScan);
+            tree.SetItemStateIcon (sc, state.bScan[i] ? iconEyeOpen : iconEyeClosed);
+            nodes.push_back ({sc, kNodeScan, i});
+        }
+    };
+
+    for (int j = (int)stories.size (); j >= 1; --j) {
+        const StoryEntry& st = stories[j - 1];
+        GS::UniString label = GS::UniString (std::to_string (st.index).c_str ()) + GS::UniString (". ")
+                            + (st.name.IsEmpty () ? GS::UniString ("Geschoss") : st.name);
+        addStory (j, label, false);
+    }
+    {
+        short below = stories.empty () ? -1 : (short)(stories.front ().index - 1);
+        GS::UniString label = GS::UniString (std::to_string (below).c_str ()) + GS::UniString (". Unter Unterkante");
+        addStory (0, label, true);
+    }
+
+    tree.ExpandItem (rootItem);
+    tree.ExpandItem (folder);
+    tree.EnableDraw ();
+}
+
+// --- Auge umschalten ---------------------------------------------------------
+
+void PunktwolkenPalette::SetEye (Int32 tvItem, bool visible)
+{
+    const Node* n = FindNode (tvItem);
+    if (n == nullptr) return;
+    int sel = SelectedCloud ();
+    if (sel < 0) return;
+
+    switch (n->kind) {
+        case kNodeStoriesFolder:
+            for (size_t k = 0; k < state.bGroup.size (); ++k) state.bGroup[k] = visible;
+            for (size_t i = 0; i < state.bScan.size (); ++i) state.bScan[i] = visible;
+            break;
+        case kNodeStory:
+            state.bGroup[n->index] = visible;
+            for (int i = 0; i < state.scanCount; ++i) {
+                double z = i < (int)state.zScan.size () ? state.zScan[i] : 0.0;
+                if (StoryIndexOfScan (z, stories) == n->index) state.bScan[i] = visible;
+            }
+            break;
+        case kNodeScan:
+            state.bScan[n->index] = visible;
+            break;
+        default:
+            return;
+    }
+
+    WriteCloudVisibility (entries[sel].libIndex, state);
+    UpdateEyes ();
+}
+
+void PunktwolkenPalette::UpdateEyes ()
+{
+    for (const Node& n : nodes) {
+        bool vis;
+        switch (n.kind) {
+            case kNodeStory: vis = n.index < (int)state.bGroup.size () && state.bGroup[n.index]; break;
+            case kNodeScan:  vis = n.index < (int)state.bScan.size ()  && state.bScan[n.index];  break;
+            case kNodeStoriesFolder: {
+                vis = false;
+                for (bool b : state.bGroup) vis = vis || b;
+                break;
+            }
+            default: continue;
+        }
+        tree.SetItemStateIcon (n.tvItem, vis ? iconEyeOpen : iconEyeClosed);
     }
 }
 
@@ -138,8 +305,52 @@ void PunktwolkenPalette::UpdateFooter ()
 
 void PunktwolkenPalette::PanelOpened (const DG::PanelOpenEvent& /*ev*/)
 {
-    SetClientSize (GetOriginalClientWidth (), GetOriginalClientHeight ());
+    for (short i = 1; i <= 3; ++i)      // Icons beim ersten Oeffnen sonst nicht sichtbar
+        toolbar.SetItemImage (i, DG::ListView::Icon, toolIcons[i]);
+    toolbar.Redraw ();
     Refresh ();
+}
+
+// --- Icon-Leiste -------------------------------------------------------------
+
+void PunktwolkenPalette::SetToolEnabled (ToolItem item, bool enabled)
+{
+    toolEnabled[item] = enabled;
+    toolbar.SetItemStatus ((short)item, enabled);
+}
+
+bool PunktwolkenPalette::ListViewSelectionChangeRequested (const DG::ListViewMouseDownEvent& ev)
+{
+    return ev.GetSource () != &toolbar;     // Leiste: nie selektieren
+}
+
+void PunktwolkenPalette::ListViewMouseDown (const DG::ListViewMouseDownEvent& ev, bool* processed)
+{
+    if (ev.GetSource () != &toolbar) return;
+    *processed = true;
+    short item = ev.GetListItem ();
+    if (item < 1 || item > 3 || !toolEnabled[item]) return;
+    switch (item) {
+        case kToolAdd:      OnAdd ();      break;
+        case kToolSettings: OnSettings (); break;
+        case kToolDelete:   OnDelete ();   break;
+    }
+}
+
+void PunktwolkenPalette::ListViewHoverStarted (const DG::ListViewHoverEvent& ev)
+{
+    if (ev.GetSource () != &toolbar) return;
+    short item = ev.GetListItem ();
+    if (item >= 1 && item <= 3 && toolEnabled[item] && toolHoverIcons[item].IsValid ())
+        toolbar.SetItemImage (item, DG::ListView::Icon, toolHoverIcons[item]);
+}
+
+void PunktwolkenPalette::ListViewHoverEnded (const DG::ListViewHoverEvent& ev)
+{
+    if (ev.GetSource () != &toolbar) return;
+    short item = ev.GetListItem ();
+    if (item >= 1 && item <= 3)
+        toolbar.SetItemImage (item, DG::ListView::Icon, toolIcons[item]);
 }
 
 void PunktwolkenPalette::PanelResized (const DG::PanelResizeEvent& ev)
@@ -147,14 +358,10 @@ void PunktwolkenPalette::PanelResized (const DG::PanelResizeEvent& ev)
     short dh = ev.GetHorizontalChange ();
     short dv = ev.GetVerticalChange ();
     BeginMoveResizeItems ();
-    delBtn.Move (dh, 0);
-    listBox.Resize (dh, dv);
-    relBtn.Move (0, dv);
-    selDensEdit.Move (0, dv);
-    selDensLabel.Move (0, dv);
+    cloudPopUp.Resize (dh, 0);
+    tree.Resize (dh, dv);
     versionLabel.Move (dh, dv);
     EndMoveResizeItems ();
-    listBox.SetTabFieldBeginEndPosition (1, 0, listBox.GetItemWidth ());
 }
 
 void PunktwolkenPalette::PanelCloseRequested (const DG::PanelCloseRequestEvent& /*ev*/,
@@ -164,55 +371,77 @@ void PunktwolkenPalette::PanelCloseRequested (const DG::PanelCloseRequestEvent& 
     Hide ();
 }
 
-// --- ListBoxObserver ---------------------------------------------------------
+// --- PopUpObserver -----------------------------------------------------------
 
-void PunktwolkenPalette::ListBoxSelectionChanged (const DG::ListBoxSelectionEvent& ev)
+void PunktwolkenPalette::PopUpChanged (const DG::PopUpChangeEvent& ev)
 {
-    if (ev.GetSource () == &listBox)
-        UpdateFooter ();
+    if (ev.GetSource () == &cloudPopUp)
+        RebuildTree ();
 }
 
-// --- ButtonItemObserver ------------------------------------------------------
+// --- TreeViewObserver: Klick aufs Auge ---------------------------------------
 
-void PunktwolkenPalette::ButtonClicked (const DG::ButtonClickEvent& ev)
+void PunktwolkenPalette::TreeViewItemClicked (const DG::TreeViewItemClickEvent& ev,
+                                               bool* denySelectionChange)
 {
-    const DG::Item* src = ev.GetSource ();
+    if (ev.GetSource () != &tree) return;
+    if (ev.GetPartId () != DG::TreeViewItemClickEvent::StateIcon) return;
 
-    if (src == &addBtn) {
-        if (importing) return;
-        importing = true;
-        defaultDensity = (int)defDensEdit.GetValue ();
-        GS::UniString newName = DoImport (defaultDensity);
-        Refresh ();
-        if (!newName.IsEmpty ()) {
-            for (UInt32 i = 0; i < entries.GetSize (); ++i) {
-                if (entries[i].name == newName) {
-                    // Erneuter Import derselben E57 (GSM-Neuerzeugung): kein zweites Objekt
-                    if (!HasPlacedInstances (entries[i].libIndex))
-                        AutoPlaceEntry (entries[i]);
-                    break;
-                }
+    Int32 item = ev.GetTreeItem ();
+    const Node* n = FindNode (item);
+    if (n == nullptr || n->kind == kNodeCloud) return;
+
+    bool nowVisible;
+    switch (n->kind) {
+        case kNodeStory: nowVisible = state.bGroup[n->index]; break;
+        case kNodeScan:  nowVisible = state.bScan[n->index];  break;
+        default: {
+            nowVisible = false;
+            for (bool b : state.bGroup) nowVisible = nowVisible || b;
+        }
+    }
+    *denySelectionChange = true;
+    SetEye (item, !nowVisible);
+}
+
+// --- Button-Aktionen ---------------------------------------------------------
+
+void PunktwolkenPalette::OnAdd ()
+{
+    if (importing) return;
+    importing = true;
+    defaultDensity = (int)densEdit.GetValue ();
+    GS::UniString newName = DoImport (defaultDensity);
+    Refresh ();
+    if (!newName.IsEmpty ()) {
+        for (UInt32 i = 0; i < entries.GetSize (); ++i) {
+            if (entries[i].name == newName) {
+                // Erneuter Import derselben E57 (GSM-Neuerzeugung): kein zweites Objekt
+                if (!HasPlacedInstances (entries[i].libIndex))
+                    AutoPlaceEntry (entries[i]);
+                cloudPopUp.SelectItem ((short)(i + 1));
+                RebuildTree ();
+                break;
             }
         }
-        importing = false;
-        return;
     }
+    importing = false;
+}
 
-    short sel    = listBox.GetSelectedItem ();
-    int   idx    = (int)sel - 1;
+void PunktwolkenPalette::OnSettings ()
+{
+    int sel = SelectedCloud ();
+    if (sel < 0) return;
+    if (!OpenSettingsDialog (entries[sel].libIndex))
+        ACAPI_WriteReport ("Punktwolke ist nicht platziert - kein Einstellungsdialog.", false);
+    RebuildTree ();
+}
 
-    if (src == &relBtn && sel > 0 && idx < (int)entries.GetSize ()) {
-        int newDens = (int)selDensEdit.GetValue ();
-        GS::UniString added = DoImport (newDens, &entries[idx].e57Path);
-        if (!added.IsEmpty ()) Refresh ();
-        return;
-    }
-
-    if (src == &delBtn && sel > 0 && idx < (int)entries.GetSize ()) {
-        bool deleted = TryDeleteEntry (entries[idx]);
-        if (deleted) Refresh ();
-        return;
-    }
+void PunktwolkenPalette::OnDelete ()
+{
+    int sel = SelectedCloud ();
+    if (sel < 0) return;
+    if (TryDeleteEntry (entries[sel])) Refresh ();
 }
 
 // --- PaletteControlCallBack --------------------------------------------------

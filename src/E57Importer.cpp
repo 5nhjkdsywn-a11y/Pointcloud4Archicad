@@ -6,6 +6,7 @@
 
 #include "File.hpp"
 #include "FileSystem.hpp"
+#include "HashTable.hpp"
 
 #include "DGDLLExport.h"
 #include "DGFileDlg.hpp"
@@ -988,6 +989,41 @@ static void ReloadLibraries ()
     Compat_ReloadLibraries ();
 }
 
+// --- Platzierte Instanzen eines Bibliothekselements ---------------------------
+// Vergleich ueber die stabile GUID (ownUnID), nicht ueber den LibPart-Index:
+// der Index aendert sich beim Bibliotheks-Reload, die platzierten Objekte
+// behalten voruebergehend den alten.
+
+static GS::UniString LibPartUnID (Int32 libIndex)
+{
+    API_LibPart lp = {};
+    lp.index = libIndex;
+    if (libIndex <= 0 || ACAPI_LibPart_Get (&lp) != NoError) return GS::UniString ();
+    return GS::UniString (lp.ownUnID);
+}
+
+static GS::Array<API_Guid> PlacedInstances (Int32 libIndex)
+{
+    GS::Array<API_Guid> result;
+    GS::UniString wanted = LibPartUnID (libIndex);
+    if (wanted.IsEmpty ()) return result;
+
+    GS::Array<API_Guid> elemList;
+    ACAPI_Element_GetElemList (API_ObjectID, &elemList);
+    GS::HashTable<Int32, bool> matchByIndex;    // Cache: libInd -> gehoert zu uns?
+    for (const auto& guid : elemList) {
+        API_Element elem = {};
+        elem.header.guid = guid;
+        if (ACAPI_Element_Get (&elem) != NoError) continue;
+        Int32 li = elem.object.libInd;
+        if (!matchByIndex.ContainsKey (li))
+            matchByIndex.Add (li, li == libIndex || LibPartUnID (li) == wanted);
+        if (matchByIndex[li])
+            result.Push (guid);
+    }
+    return result;
+}
+
 // --- Parameter in platzierten Instanzen aktualisieren ------------------------
 
 static int UpdatePlacedParams (Int32 libIdx, int newDensity, int64_t writtenPoints)
@@ -998,17 +1034,7 @@ static int UpdatePlacedParams (Int32 libIdx, int newDensity, int64_t writtenPoin
     ACAPI_LibPart_GetParams (libIdx, &lpA, &lpB, &parNum, &lpPars);
     ACAPI_DisposeAddParHdl (&lpPars);
 
-    GS::Array<API_Guid> elemList;
-    ACAPI_Element_GetElemList (API_ObjectID, &elemList);
-
-    GS::Array<API_Guid> toUpdate;
-    for (const auto& guid : elemList) {
-        API_Element elem = {};
-        elem.header.guid = guid;
-        if (ACAPI_Element_Get (&elem) != NoError) continue;
-        if (elem.object.libInd == libIdx)
-            toUpdate.Push (guid);
-    }
+    GS::Array<API_Guid> toUpdate = PlacedInstances (libIdx);
 
     int updCount = 0;
     if (toUpdate.GetSize () > 0) {
@@ -1116,16 +1142,164 @@ GS::Array<PointCloudEntry> CollectOurLibParts ()
 
 bool HasPlacedInstances (Int32 libIndex)
 {
-    GS::Array<API_Guid> elemList;
-    ACAPI_Element_GetElemList (API_ObjectID, &elemList);
-    for (const auto& guid : elemList) {
-        API_Element elem = {};
-        elem.header.guid = guid;
-        if (ACAPI_Element_Get (&elem) != NoError) continue;
-        if (elem.object.libInd == libIndex)
-            return true;
+    return !PlacedInstances (libIndex).IsEmpty ();
+}
+
+API_Guid FirstPlacedInstance (Int32 libIndex)
+{
+    GS::Array<API_Guid> inst = PlacedInstances (libIndex);
+    return inst.IsEmpty () ? APINULLGuid : inst[0];
+}
+
+// --- Geschosse ---------------------------------------------------------------
+
+std::vector<StoryEntry> GetStoriesAscending ()
+{
+    std::vector<StoryEntry> stories;
+    API_StoryInfo si = {};
+    if (Compat_GetStorySettings (&si) != NoError || si.data == nullptr)
+        return stories;
+    for (short i = si.firstStory; i <= si.lastStory; ++i) {
+        const API_StoryType& s = (*si.data)[i - si.firstStory];
+        StoryEntry e;
+        e.index = s.index;
+        e.level = s.level;
+        e.name  = GS::UniString (s.uName);
+        stories.push_back (e);
     }
-    return false;
+    BMKillHandle ((GSHandle*)&si.data);
+    std::sort (stories.begin (), stories.end (),
+        [] (const StoryEntry& a, const StoryEntry& b) { return a.level < b.level; });
+    return stories;
+}
+
+// Gleiche Regel wie im GDL-Master-Script: hoechstes Geschoss, dessen Unterkante <= zScan
+int StoryIndexOfScan (double zScan, const std::vector<StoryEntry>& stories)
+{
+    int sg = 0;
+    for (size_t j = 0; j < stories.size (); ++j)
+        if (zScan >= stories[j].level) sg = (int)j + 1;
+    return sg;
+}
+
+// --- Zustand lesen / schreiben -----------------------------------------------
+
+static Int32 ArrayLen (const API_AddParType& p)
+{
+    Int32 n = p.dim1 * (p.dim2 > 0 ? p.dim2 : 1);
+    return (p.value.array != nullptr && n > 0) ? n : 0;
+}
+
+bool ReadCloudState (Int32 libIndex, CloudState& out)
+{
+    out = CloudState ();
+    API_Guid guid = FirstPlacedInstance (libIndex);
+    if (guid == APINULLGuid) return false;
+
+    API_ElementMemo memo = {};
+    if (ACAPI_Element_GetMemo (guid, &memo, APIMemoMask_AddPars) != NoError || memo.params == nullptr) {
+        ACAPI_DisposeElemMemoHdls (&memo);
+        return false;
+    }
+    Int32 parNum = (Int32)(BMGetHandleSize ((GSHandle)memo.params) / sizeof (API_AddParType));
+    for (Int32 j = 0; j < parNum; ++j) {
+        const API_AddParType& p = (*memo.params)[j];
+        if (strcmp (p.name, "iScanCount") == 0) {
+            out.scanCount = (int)(p.value.real + 0.5);
+        } else if (strcmp (p.name, "zScan") == 0) {
+            Int32 n = ArrayLen (p);
+            for (Int32 k = 0; k < n; ++k) out.zScan.push_back (((double*)*p.value.array)[k]);
+        } else if (strcmp (p.name, "bScan") == 0) {
+            Int32 n = ArrayLen (p);
+            for (Int32 k = 0; k < n; ++k) out.bScan.push_back (((double*)*p.value.array)[k] > 0.5);
+        } else if (strcmp (p.name, "bGroup") == 0) {
+            Int32 n = ArrayLen (p);
+            for (Int32 k = 0; k < n; ++k) out.bGroup.push_back (((double*)*p.value.array)[k] > 0.5);
+        }
+    }
+    ACAPI_DisposeElemMemoHdls (&memo);
+    return out.scanCount > 0;
+}
+
+// Schreibt ein numerisches 1D-Array in einen Parameter (Groesse darf wachsen)
+static void SetNumArray (API_AddParType& p, const std::vector<double>& vals)
+{
+    Int32 n = (Int32)vals.size ();
+    if (p.value.array != nullptr) BMKillHandle (&p.value.array);
+    p.value.array = BMAllocateHandle (n * sizeof (double), ALLOCATE_CLEAR, 0);
+    p.dim1 = n;
+    p.dim2 = 1;
+    for (Int32 k = 0; k < n; ++k) ((double*)*p.value.array)[k] = vals[k];
+}
+
+bool WriteCloudVisibility (Int32 libIndex, const CloudState& st)
+{
+    GS::Array<API_Guid> targets = PlacedInstances (libIndex);
+    if (targets.IsEmpty ()) return false;
+
+    std::vector<double> g (st.bGroup.begin (), st.bGroup.end ());
+    std::vector<double> sc (st.bScan.begin (),  st.bScan.end ());
+
+    int updCount = 0;
+    ACAPI_CallUndoableCommand ("Punktwolke: Sichtbarkeit",
+        [&] () -> GSErrCode {
+            for (auto guid : targets) {
+                API_ElementMemo memo = {};
+                if (ACAPI_Element_GetMemo (guid, &memo, APIMemoMask_AddPars) != NoError || memo.params == nullptr) {
+                    ACAPI_DisposeElemMemoHdls (&memo);
+                    continue;
+                }
+                Int32 parNum = (Int32)(BMGetHandleSize ((GSHandle)memo.params) / sizeof (API_AddParType));
+                for (Int32 j = 0; j < parNum; ++j) {
+                    API_AddParType& p = (*memo.params)[j];
+                    if (strcmp (p.name, "bGroup") == 0 || strcmp (p.name, "bGroupPrev") == 0)
+                        SetNumArray (p, g);       // Prev mitziehen, sonst synchronisiert das Master-Script zurueck
+                    else if (strcmp (p.name, "bScan") == 0)
+                        SetNumArray (p, sc);
+                }
+                if (ACAPI_Element_ChangeMemo (guid, APIMemoMask_AddPars, &memo) == NoError)
+                    ++updCount;
+                ACAPI_DisposeElemMemoHdls (&memo);
+            }
+            return NoError;
+        });
+    return updCount > 0;
+}
+
+// --- Einstellungsdialog der platzierten Punktwolke oeffnen -------------------
+// Der Dialog arbeitet auf der Selektion, und die wird erst im naechsten
+// Event-Loop-Durchlauf wirksam. Deshalb: hier selektieren, den Dialog dann
+// ueber einen eigenen Add-on-Befehl aus dem Event-Loop oeffnen.
+
+static const API_ModulID kOwnMdid = { 709315661, 1905536138 };
+
+bool OpenSettingsDialog (Int32 libIndex)
+{
+    API_Guid guid = FirstPlacedInstance (libIndex);
+    if (guid == APINULLGuid) return false;
+
+    Compat_DeselectAll ();
+    API_Neig neig = {};
+    neig.neigID = APINeig_Symb;
+    neig.guid   = guid;
+    GS::Array<API_Neig> neigs;
+    neigs.Push (neig);
+    GSErrCode e2 = Compat_Select (neigs, true);
+    GSErrCode e3 = Compat_CallFromEventLoop (&kOwnMdid, kCmdOpenSettings, kCmdOpenSettingsVer);
+
+    return e2 == NoError && e3 == NoError;
+}
+
+GSErrCode __ACENV_CALL OpenSettingsDialogCommand (GSHandle /*params*/, GSPtr /*resultData*/, bool /*silentMode*/)
+{
+    API_ToolBoxItem tbi = {};
+    tbi.type = API_ObjectID;
+#ifdef ServerMainVers_2700
+    GSErrCode err = ACAPI_Dialog_SettingsDialog (&tbi);
+#else
+    GSErrCode err = ACAPI_Interface (APIIo_SettingsDialogID, &tbi, nullptr);
+#endif
+    return err;      // APIERR_CANCEL, wenn der Dialog abgebrochen wurde
 }
 
 // --- AutoPlaceEntry ----------------------------------------------------------
@@ -1642,16 +1816,7 @@ GS::UniString DoImport (int densityPct, const GS::UniString* forceE57Path)
 
 bool TryDeleteEntry (const PointCloudEntry& entry)
 {
-    GS::Array<API_Guid> elemList;
-    ACAPI_Element_GetElemList (API_ObjectID, &elemList);
-    GS::Array<API_Guid> toDelete;
-    for (const auto& guid : elemList) {
-        API_Element elem = {};
-        elem.header.guid = guid;
-        if (ACAPI_Element_Get (&elem) != NoError) continue;
-        if (elem.object.libInd == entry.libIndex)
-            toDelete.Push (guid);
-    }
+    GS::Array<API_Guid> toDelete = PlacedInstances (entry.libIndex);
 
     GS::UniString subText;
     if (toDelete.GetSize () > 0) {

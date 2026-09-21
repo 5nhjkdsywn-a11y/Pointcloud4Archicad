@@ -49,7 +49,10 @@ API_AddonType CheckEnvironment (API_EnvirParams* envir)
 // RegisterInterface: Menüeintrag registrieren
 GSErrCode RegisterInterface (void)
 {
-    return ACAPI_MenuItem_RegisterMenu (kMenuResId, 32600, MenuCode_UserDef, MenuFlag_Default);
+    GSErrCode err = ACAPI_MenuItem_RegisterMenu (kMenuResId, 32600, MenuCode_UserDef, MenuFlag_Default);
+    if (err == NoError)
+        err = Compat_RegisterSupportedService (kCmdOpenSettings, kCmdOpenSettingsVer);   // fuer CallFromEventLoop
+    return err;
 }
 
 // Initialize: Handler installieren, Palette-Callback registrieren
@@ -60,6 +63,10 @@ GSErrCode Initialize (void)
         return err;
 
     err = PunktwolkenPalette::RegisterPaletteControlCallBack ();
+    if (DBERROR (err != NoError))
+        return err;
+
+    err = Compat_InstallModulCommandHandler (kCmdOpenSettings, kCmdOpenSettingsVer, OpenSettingsDialogCommand);
     if (DBERROR (err != NoError))
         return err;
 

@@ -6,15 +6,5 @@
 	1905536138
 }
 
-/* Palette-Icons */
-'GICN' 32401 "PW Delete" {
-	"PW_Delete"
-}
-
-'GICN' 32402 "PW Reload" {
-	"PW_Reload"
-}
-
-'GICN' 32403 "PW Add" {
-	"PW_Add"
-}
+/* Palette-Icons: alle aus ArchiCADs eigenen Ressourcen (RSGetApplicationResModule),
+   siehe ArchicadIconId in PunktwolkenPalette.cpp — keine eigenen GICN-Ressourcen. */
