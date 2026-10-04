@@ -49,10 +49,19 @@ API_AddonType CheckEnvironment (API_EnvirParams* envir)
 // RegisterInterface: Menüeintrag registrieren
 GSErrCode RegisterInterface (void)
 {
-    GSErrCode err = ACAPI_MenuItem_RegisterMenu (kMenuResId, 32600, MenuCode_UserDef, MenuFlag_Default);
-    if (err == NoError)
-        err = Compat_RegisterSupportedService (kCmdOpenSettings, kCmdOpenSettingsVer);   // fuer CallFromEventLoop
-    return err;
+    GSErrCode menuErr = ACAPI_MenuItem_RegisterMenu (kMenuResId, 32600, MenuCode_UserDef, MenuFlag_Default);
+
+    // Der Add-on-Befehl fuer den verzoegerten Einstellungsdialog ist Beiwerk:
+    // sein Fehler darf NICHT zurueckgegeben werden, sonst verwirft ArchiCAD die
+    // gesamte Registrierung inklusive Menueeintrag (das Add-on gilt trotzdem als geladen).
+    Compat_RegisterSupportedService (kCmdOpenSettings, kCmdOpenSettingsVer);
+
+    // MenuCode_UserDef heisst "vom Anwender konfigurierbar": der Befehl wird registriert,
+    // die Platzierung kommt aber aus der Arbeitsumgebung. Die "Planung"-Kopfzeile der
+    // STR#-Ressource ist nur der Vorschlag. Kennt ein Profil den Befehl noch nicht
+    // (neue AC-Version, neuer Rechner), erscheint kein Menuepunkt — dann einmalig unter
+    // Optionen > Arbeitsumgebung > Menues zuordnen.
+    return menuErr;
 }
 
 // Initialize: Handler installieren, Palette-Callback registrieren
