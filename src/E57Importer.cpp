@@ -278,6 +278,23 @@ static bool ReadPwMeta (const char* outputDirPath, const char* baseName,
     return true;
 }
 
+// --- Existiert die Datei? (portabel, ohne access/F_OK) ----------------------
+
+static bool FileExists (const char* path)
+{
+    FILE* f = fopen (path, "rb");
+    if (f == nullptr) return false;
+    fclose (f);
+    return true;
+}
+
+// Pfad einer Scan-GSPC zusammensetzen: <dir>/<base>_<DDD>_<nr>.gspc
+static void GspcPathOf (char* out, size_t outSize, const char* dir, const char* base,
+                         int densityPct, int scanNr1)
+{
+    snprintf (out, outSize, "%s%c%s_%03d_%d.gspc", dir, PATH_SEP, base, densityPct, scanNr1);
+}
+
 // --- Hilfsfunktion: Dichte-Prozent → dreistelliger Ordner-/Dateiname-Code -----
 
 static GS::UniString DensityDirName (int densityPct)
@@ -494,12 +511,31 @@ static bool WriteGsmViaXml (
         "endif\n\n"
         "if bVisible then\n\n");
     {
+        // Nur Standorte referenzieren, deren GSPC auch wirklich auf der Platte liegt.
+        // Eine fehlende Datei wuerde sonst beim Zeichnen "Kann Bilddatei nicht finden"
+        // ausloesen und je nach AC-Version das ganze 2D-Symbol ungueltig machen.
         char dirName[8];
         snprintf (dirName, sizeof (dirName), "%03d", densityPct);
-        for (int sc = 0; sc < scanCount; ++sc)
+        int fehlend = 0;
+        for (int sc = 0; sc < scanCount; ++sc) {
+            char pfad[1024];
+            GspcPathOf (pfad, sizeof (pfad), outputDirPath, baseName, densityPct, sc + 1);
+            if (!FileExists (pfad)) {
+                ++fehlend;
+                fprintf (f, "\t! Standort %d uebersprungen - %s_%s_%d.gspc fehlt\n",
+                         sc + 1, baseName, dirName, sc + 1);
+                continue;
+            }
             fprintf (f, "\tif _sv[%d] then POINTCLOUD \"%s_%s_%d.gspc\"\n",
                 sc + 1, baseName, dirName, sc + 1);
+        }
         fprintf (f, "\n");
+        if (fehlend > 0) {
+            char buf[128];
+            snprintf (buf, sizeof (buf), "WARNUNG: %d von %d GSPC-Dateien fehlen (Dichte %d%%)",
+                      fehlend, scanCount, densityPct);
+            Log (buf);
+        }
     }
     fprintf (f,
         "\tif bShowNumbers then\n"
@@ -1408,17 +1444,33 @@ GS::UniString DoImport (int densityPct, const GS::UniString* forceE57Path)
     // GSPC dieser Auflösung bereits vorhanden?
     // → E57-Parsing überspringen, aber GSM mit gespeicherten Parametern neu erzeugen
     {
-        char checkPath[1024];
-        snprintf (checkPath, sizeof (checkPath), "%s%c%s_%s_1.gspc",
-                  outputDirPath.ToCStr ().Get (), PATH_SEP,
-                  baseName.ToCStr ().Get (), dirCode.ToCStr ().Get ());
-        if (access (checkPath, F_OK) == 0) {
-            Log ("GSPC vorhanden, lese PwMeta fuer GSM-Regenerierung.");
-            PwMeta m = {};
-            std::vector<double> tx, ty, tz;
-            std::string metaE57;
-            if (ReadPwMeta (outputDirPath.ToCStr ().Get (),
-                             baseName.ToCStr ().Get (), m, tx, ty, tz, metaE57)) {
+        // Abkuerzung (GSM neu erzeugen statt E57 neu zu lesen) nur, wenn ALLE
+        // Standorte dieser Dichte vorliegen. Frueher wurde nur Standort 1 geprueft —
+        // fehlte ein spaeterer, verwies das neue GSM auf eine nicht existierende Datei.
+        PwMeta m = {};
+        std::vector<double> tx, ty, tz;
+        std::string metaE57;
+        bool metaOk = ReadPwMeta (outputDirPath.ToCStr ().Get (),
+                                   baseName.ToCStr ().Get (), m, tx, ty, tz, metaE57);
+        int fehlendeGspc = 0;
+        if (metaOk) {
+            for (int sc = 0; sc < (int)m.scanCount; ++sc) {
+                char pfad[1024];
+                GspcPathOf (pfad, sizeof (pfad), outputDirPath.ToCStr ().Get (),
+                            baseName.ToCStr ().Get (), densityPct, sc + 1);
+                if (!FileExists (pfad)) ++fehlendeGspc;
+            }
+        }
+        if (metaOk && fehlendeGspc > 0) {
+            char buf[160];
+            snprintf (buf, sizeof (buf),
+                      "%d von %d GSPC-Dateien fehlen - vollstaendiger Neuimport statt Abkuerzung.",
+                      fehlendeGspc, (int)m.scanCount);
+            Log (buf);
+        }
+        {
+            if (metaOk && fehlendeGspc == 0) {
+                Log ("Alle GSPC vorhanden, erzeuge GSM aus PwMeta neu.");
                 bool ok = WriteGsmViaXml (
                     (int)m.scanCount, baseName.ToCStr ().Get (),
                     outputDirPath.ToCStr ().Get (),
@@ -1440,7 +1492,6 @@ GS::UniString DoImport (int densityPct, const GS::UniString* forceE57Path)
                     return baseName;
                 }
             }
-            Log ("PwMeta nicht lesbar, starte vollen Import.");
         }
     }
 
@@ -1522,12 +1573,21 @@ GS::UniString DoImport (int densityPct, const GS::UniString* forceE57Path)
             Int32   scanUpdateStep = (Int32)std::max ((int64_t)1, scanExpected[si] / 200);
             int64_t scanWritten    = 0;
 
+            // Die Positions-Arrays muessen fuer JEDEN Standort einen Eintrag haben,
+            // sonst verschieben sich die Indizes gegen die Standortnummern — und
+            // WriteGsmViaXml liest ueber das Ende des Vektors hinaus.
             e57::Data3D header;
-            if (!reader.ReadData3D (si, header)) continue;
-
-            scanTx.push_back (header.pose.translation.x);
-            scanTy.push_back (header.pose.translation.y);
-            scanTz.push_back (header.pose.translation.z);
+            bool kopfOk = reader.ReadData3D (si, header);
+            scanTx.push_back (kopfOk ? header.pose.translation.x : 0.0);
+            scanTy.push_back (kopfOk ? header.pose.translation.y : 0.0);
+            scanTz.push_back (kopfOk ? header.pose.translation.z : 0.0);
+            if (!kopfOk) {
+                char buf[128];
+                snprintf (buf, sizeof (buf), "Standort %lld: Kopfdaten nicht lesbar, uebersprungen.",
+                          (long long)(si + 1));
+                Log (buf);
+                continue;
+            }
 
             // baseName_DDD_scanNr.gspc  direkt im outputDir (kein Unterordner)
             char scanSuffix[64];
@@ -1542,8 +1602,8 @@ GS::UniString DoImport (int densityPct, const GS::UniString* forceE57Path)
             GspcWriter gspc;
             if (!gspc.Open (scanGspcPath.ToCStr ().Get ())) {
                 char buf[256];
-                snprintf (buf, sizeof (buf), "GSPC öffnen fehlgeschlagen: %s",
-                          scanGspcPath.ToCStr ().Get ());
+                snprintf (buf, sizeof (buf), "FEHLER Standort %lld: GSPC nicht anlegbar: %s",
+                          (long long)(si + 1), scanGspcPath.ToCStr ().Get ());
                 Log (buf);
                 continue;
             }
@@ -1558,32 +1618,40 @@ GS::UniString DoImport (int densityPct, const GS::UniString* forceE57Path)
                 buffers.colorRed   = cr.data (); buffers.colorGreen = cg.data ();
                 buffers.colorBlue  = cb.data (); buffers.isColorInvalid = colorInvalid.data ();
             }
-            auto cvr = reader.SetUpData3DPointsData (si, CHUNK, buffers);
-            uint64_t nRead;
-            int64_t  scanLocalIdx = 0;
-            while ((nRead = cvr.read ()) > 0) {
-                for (size_t i = 0; i < (size_t)nRead; ++i) {
-                    if (scanLocalIdx % STRIDE == 0) {
-                        double wx, wy, wz;
-                        ApplyPose (header.pose, x[i], y[i], z[i], wx, wy, wz);
-                        uint8_t r = 200, g = 200, b = 200;
-                        if (hasColor && !colorInvalid[i]) {
-                            r = (uint8_t)std::min<int> ((int)cr[i], 255);
-                            g = (uint8_t)std::min<int> ((int)cg[i], 255);
-                            b = (uint8_t)std::min<int> ((int)cb[i], 255);
+            // Ein Lesefehler mitten im Scan darf den Lauf nicht abbrechen: Datei
+            // schliessen, Standort vermerken, mit dem naechsten weitermachen.
+            try {
+                auto cvr = reader.SetUpData3DPointsData (si, CHUNK, buffers);
+                uint64_t nRead;
+                int64_t  scanLocalIdx = 0;
+                while ((nRead = cvr.read ()) > 0) {
+                    for (size_t i = 0; i < (size_t)nRead; ++i) {
+                        if (scanLocalIdx % STRIDE == 0) {
+                            double wx, wy, wz;
+                            ApplyPose (header.pose, x[i], y[i], z[i], wx, wy, wz);
+                            uint8_t r = 200, g = 200, b = 200;
+                            if (hasColor && !colorInvalid[i]) {
+                                r = (uint8_t)std::min<int> ((int)cr[i], 255);
+                                g = (uint8_t)std::min<int> ((int)cg[i], 255);
+                                b = (uint8_t)std::min<int> ((int)cb[i], 255);
+                            }
+                            gspc.Write ((float)wx, (float)wy, (float)wz, r, g, b);
+                            ++scanWritten;
+                            if (scanWritten % scanUpdateStep == 0) {
+                                Int32 prog = (Int32)std::min (scanWritten, scanExpected[si]);
+                                Compat_SetProcessValue (&prog);
+                                if (Compat_IsProcessCanceled ()) { cancelled = true; break; }
+                            }
                         }
-                        gspc.Write ((float)wx, (float)wy, (float)wz, r, g, b);
-                        ++scanWritten;
-                        if (scanWritten % scanUpdateStep == 0) {
-                            Int32 prog = (Int32)std::min (scanWritten, scanExpected[si]);
-                            Compat_SetProcessValue (&prog);
-                            if (Compat_IsProcessCanceled ()) { cancelled = true; break; }
-                        }
+                        ++scanLocalIdx;
                     }
-                    ++scanLocalIdx;
                 }
+                cvr.close ();
+            } catch (const std::exception& ex) {
+                char buf[256];
+                snprintf (buf, sizeof (buf), "FEHLER Standort %lld: %s", (long long)(si + 1), ex.what ());
+                Log (buf);
             }
-            cvr.close ();
             gspc.Close ();
 
             if (!gspc.firstPt) {
