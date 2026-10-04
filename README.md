@@ -63,10 +63,26 @@ Die GDL-Objekte selbst sind versionsunabhängig.
 
 ## Installation (fertiges Add-on)
 
-1. Bundle (`Pointcloud4Archicad_x86_64_XX.bundle`) bzw. `.apx` in einen
-   Ordner deiner Wahl kopieren, z. B. `/Applications/GRAPHISOFT/Pointcloud4Archicad/`
+1. ZIP entpacken und das Bundle (`Pointcloud4Archicad_x86_64_XX.bundle`) bzw.
+   die `.apx` in einen Ordner deiner Wahl kopieren, z. B.
+   `/Applications/GRAPHISOFT/Pointcloud4Archicad/`
 2. Archicad → *Optionen → Add-On Manager → Hinzufügen* → Bundle wählen
 3. Archicad neu starten
+4. Der Befehl heißt **Punktwolken-Palette…**. Erscheint er in einer neuen
+   Archicad-Version nicht im Menü, liegt er unter *Optionen → Arbeitsumgebung →
+   Menüs* bereit und wird dort einmalig zugeordnet — das Add-on registriert ihn
+   benutzerkonfigurierbar, die Platzierung kommt aus dem Profil.
+
+**macOS:** Die Bundles sind mit einer Apple Developer ID signiert und von Apple
+notarisiert, das Ticket ist angeheftet. Sie laufen damit ohne Gatekeeper-Warnung
+und auch offline. Immer als **ZIP weitergeben** (`ditto -c -k --keepParent`) —
+beim Kopieren über Cloud-Sync gehen Ausführungsrechte verloren und Archicad lädt
+das Add-on stillschweigend nicht.
+
+**Windows:** Die `.apx`-Dateien sind nicht signiert. Das ist für den Betrieb
+nicht nötig; Windows blockiert keine unsignierten Add-on-DLLs (eine
+Authenticode-Signatur wäre erst bei einem eigenen Installer oder unter
+AppLocker-Richtlinien relevant).
 
 ## Selbst bauen
 
