@@ -11,6 +11,7 @@
 #ifndef TOOLICON_HPP
 #define TOOLICON_HPP
 
+#include "APIEnvir.h"   // muss vor den DG-Headern stehen (Windows: WINDOWS/Typen fuer DGUtility.hpp)
 #include "DGDLLExport.h"
 #include "DGUtility.hpp"
 
