@@ -10,6 +10,7 @@
 
 #include "DGDLLExport.h"
 #include "DGFileDlg.hpp"
+#include "DGFileDialog.hpp"
 #include "DGDialog.hpp"
 
 #include "E57SimpleReader.h"
@@ -33,6 +34,7 @@
 #  include <fcntl.h>
 #  include <unistd.h>
 #  include <dirent.h>
+#  include <mach-o/dyld.h>
 #endif
 
 // --- Version-String ----------------------------------------------------------
@@ -173,40 +175,276 @@ static void GetOrCreateGuid (const char* outputDirPath,
 }
 
 // --- LP_XMLConverter-Pfad ----------------------------------------------------
+// Ohne LP_XMLConverter entsteht kein GSM. Suchreihenfolge:
+//   1. vom Benutzer gewaehlter Pfad (Add-on-Preferences, gilt ueber Sitzungen hinweg)
+//   2. neben der laufenden Archicad-Programmdatei:
+//        Windows: <Installationsordner>\LP_XMLConverter.exe
+//        macOS:   <Archicad.app>/Contents/MacOS/LP_XMLConverter.app/Contents/MacOS/LP_XMLConverter
+//   3. feste Standardpfade (beide Schreibweisen des Ordners)
+// Findet sich nichts, fragt EnsureLpXmlConverter () per Ordnerdialog nach dem
+// Archicad-Programmordner — und zwar VOR dem Import, nicht erst nach dem E57-Lesen.
+// (Frueher stand fuer Windows/AC26 "ARCHICAD26" ohne Leerzeichen fest im Code —
+// der Converter wurde nie gefunden, es entstand kein GSM.)
 
 #ifdef _WIN32
 #  ifdef ServerMainVers_2900
-static const char* LP_XMLCONVERTER =
-    "C:\\Program Files\\GRAPHISOFT\\ARCHICAD 29\\LP_XMLConverter.exe";
+static const char* LP_XMLCONVERTER_FALLBACK [] = {
+    "C:\\Program Files\\GRAPHISOFT\\Archicad 29\\LP_XMLConverter.exe",
+    "C:\\Program Files\\GRAPHISOFT\\ARCHICAD29\\LP_XMLConverter.exe" };
 #  elif defined(ServerMainVers_2800)
-static const char* LP_XMLCONVERTER =
-    "C:\\Program Files\\GRAPHISOFT\\ARCHICAD 28\\LP_XMLConverter.exe";
+static const char* LP_XMLCONVERTER_FALLBACK [] = {
+    "C:\\Program Files\\GRAPHISOFT\\Archicad 28\\LP_XMLConverter.exe",
+    "C:\\Program Files\\GRAPHISOFT\\ARCHICAD28\\LP_XMLConverter.exe" };
 #  elif defined(ServerMainVers_2700)
-static const char* LP_XMLCONVERTER =
-    "C:\\Program Files\\GRAPHISOFT\\ARCHICAD 27\\LP_XMLConverter.exe";
+static const char* LP_XMLCONVERTER_FALLBACK [] = {
+    "C:\\Program Files\\GRAPHISOFT\\Archicad 27\\LP_XMLConverter.exe",
+    "C:\\Program Files\\GRAPHISOFT\\ARCHICAD27\\LP_XMLConverter.exe" };
 #  else
-static const char* LP_XMLCONVERTER =
-    "C:\\Program Files\\GRAPHISOFT\\ARCHICAD26\\LP_XMLConverter.exe";
+static const char* LP_XMLCONVERTER_FALLBACK [] = {
+    "C:\\Program Files\\GRAPHISOFT\\Archicad 26\\LP_XMLConverter.exe",
+    "C:\\Program Files\\GRAPHISOFT\\ARCHICAD26\\LP_XMLConverter.exe" };
 #  endif
 #else
 #  ifdef ServerMainVers_2900
-static const char* LP_XMLCONVERTER =
+static const char* LP_XMLCONVERTER_FALLBACK [] = {
     "/Applications/GRAPHISOFT/ARCHICAD29/Archicad 29.app/Contents/MacOS/"
-    "LP_XMLConverter.app/Contents/MacOS/LP_XMLConverter";
+    "LP_XMLConverter.app/Contents/MacOS/LP_XMLConverter" };
 #  elif defined(ServerMainVers_2800)
-static const char* LP_XMLCONVERTER =
+static const char* LP_XMLCONVERTER_FALLBACK [] = {
     "/Applications/GRAPHISOFT/ARCHICAD28/Archicad 28.app/Contents/MacOS/"
-    "LP_XMLConverter.app/Contents/MacOS/LP_XMLConverter";
+    "LP_XMLConverter.app/Contents/MacOS/LP_XMLConverter" };
 #  elif defined(ServerMainVers_2700)
-static const char* LP_XMLCONVERTER =
+static const char* LP_XMLCONVERTER_FALLBACK [] = {
     "/Applications/GRAPHISOFT/ARCHICAD27/Archicad 27.app/Contents/MacOS/"
-    "LP_XMLConverter.app/Contents/MacOS/LP_XMLConverter";
+    "LP_XMLConverter.app/Contents/MacOS/LP_XMLConverter" };
 #  else
-static const char* LP_XMLCONVERTER =
+static const char* LP_XMLCONVERTER_FALLBACK [] = {
     "/Applications/GRAPHISOFT/Archicad 26/Archicad 26.app/Contents/MacOS/"
-    "LP_XMLConverter.app/Contents/MacOS/LP_XMLConverter";
+    "LP_XMLConverter.app/Contents/MacOS/LP_XMLConverter" };
 #  endif
 #endif
+
+#ifdef _WIN32
+static std::wstring ToWide (const GS::UniString& s)
+{
+    // UniChar ist unter Windows UTF-16 wie wchar_t
+    return std::wstring (reinterpret_cast<const wchar_t*> (s.ToUStr ().Get ()));
+}
+
+static bool ConverterExists (const GS::UniString& path)
+{
+    if (path.IsEmpty ()) return false;
+    DWORD a = GetFileAttributesW (ToWide (path).c_str ());
+    return a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+// char-Pfade kommen aus GS::UniString::ToCStr () und sind damit in der
+// ANSI-Codepage (CC_Default) — nicht UTF-8.
+static std::wstring AnsiToWide (const char* s)
+{
+    int n = MultiByteToWideChar (CP_ACP, 0, s, -1, nullptr, 0);
+    if (n <= 0) return std::wstring ();
+    std::wstring w ((size_t)n, L'\0');
+    MultiByteToWideChar (CP_ACP, 0, s, -1, &w[0], n);
+    w.resize ((size_t)n - 1);
+    return w;
+}
+
+// Fuer Text in der als UTF-8 deklarierten XML-Datei: ANSI → UTF-8.
+// Ohne diese Umwandlung bricht LP_XMLConverter bei Umlauten im
+// Datei- oder Ordnernamen mit einem XML-Fehler ab.
+static std::string AnsiToUtf8 (const char* s)
+{
+    std::wstring w = AnsiToWide (s);
+    int n = WideCharToMultiByte (CP_UTF8, 0, w.c_str (), -1, nullptr, 0, nullptr, nullptr);
+    if (n <= 0) return std::string ();
+    std::string u ((size_t)n, '\0');
+    WideCharToMultiByte (CP_UTF8, 0, w.c_str (), -1, &u[0], n, nullptr, nullptr);
+    u.resize ((size_t)n - 1);
+    return u;
+}
+#else
+static const char* LP_XMLCONVERTER_SUBPATH_MAC =
+    "LP_XMLConverter.app/Contents/MacOS/LP_XMLConverter";
+
+static std::string ToUtf8 (const GS::UniString& s)
+{
+    return std::string (s.ToCStr (0, MaxUSize, CC_UTF8).Get ());
+}
+
+static bool ConverterExists (const GS::UniString& path)
+{
+    return !path.IsEmpty () && access (ToUtf8 (path).c_str (), X_OK) == 0;
+}
+#endif
+
+static GS::UniString JoinPath (const GS::UniString& dir, const char* name)
+{
+    GS::UniString p = dir;
+    if (!p.IsEmpty () && !p.EndsWith (GS::UniString ("/")) && !p.EndsWith (GS::UniString ("\\")))
+        p += GS::UniString (PATH_SEP == '\\' ? "\\" : "/");
+    p += GS::UniString (name);
+    return p;
+}
+
+// Converter in einem vom Benutzer gewaehlten Ordner suchen. Akzeptiert werden
+// der Archicad-Installationsordner und — auf dem Mac — auch das Programmpaket
+// selbst oder dessen Contents/MacOS.
+static GS::UniString ConverterInFolder (const GS::UniString& folder)
+{
+#ifdef _WIN32
+    GS::UniString p = JoinPath (folder, "LP_XMLConverter.exe");
+    return ConverterExists (p) ? p : GS::UniString ();
+#else
+    const char* subs[] = { "", "Contents/MacOS/" };
+    for (const char* sub : subs) {
+        GS::UniString p = JoinPath (folder, (std::string (sub) + LP_XMLCONVERTER_SUBPATH_MAC).c_str ());
+        if (ConverterExists (p)) return p;
+    }
+    // Installationsordner: darin liegt "Archicad NN.app"
+    if (DIR* d = opendir (ToUtf8 (folder).c_str ())) {
+        GS::UniString found;
+        while (struct dirent* ent = readdir (d)) {
+            std::string n (ent->d_name);
+            if (n.size () < 5 || n.compare (n.size () - 4, 4, ".app") != 0) continue;
+            GS::UniString p = JoinPath (JoinPath (folder, n.c_str ()),
+                                        (std::string ("Contents/MacOS/") + LP_XMLCONVERTER_SUBPATH_MAC).c_str ());
+            if (ConverterExists (p)) { found = p; break; }
+        }
+        closedir (d);
+        return found;
+    }
+    return GS::UniString ();
+#endif
+}
+
+static GS::UniString AutoFindConverter ()
+{
+#ifdef _WIN32
+    wchar_t exe[MAX_PATH * 4] = {};
+    DWORD n = GetModuleFileNameW (nullptr, exe, (DWORD)(sizeof (exe) / sizeof (exe[0])));
+    if (n > 0 && n < sizeof (exe) / sizeof (exe[0])) {
+        GS::UniString p (reinterpret_cast<const GS::UniChar::Layout*> (exe), n);
+        UInt32 sep = FindLastSep (p);
+        if (sep != GS::MaxUIndex) {
+            GS::UniString c = ConverterInFolder (p.GetSubstring (0, sep));
+            if (!c.IsEmpty ()) return c;
+        }
+    }
+#else
+    char exe[2048];
+    uint32_t size = sizeof (exe);
+    if (_NSGetExecutablePath (exe, &size) == 0) {
+        GS::UniString p (exe, CC_UTF8);
+        UInt32 sep = FindLastSep (p);
+        if (sep != GS::MaxUIndex) {
+            GS::UniString c = ConverterInFolder (p.GetSubstring (0, sep));
+            if (!c.IsEmpty ()) return c;
+        }
+    }
+#endif
+    for (const char* f : LP_XMLCONVERTER_FALLBACK) {
+        GS::UniString p (f);
+        if (ConverterExists (p)) return p;
+    }
+    return GS::UniString ();
+}
+
+// --- Gespeicherter Converter-Pfad (ACAPI-Preferences, programmweit) ----------
+
+struct PwPrefs {
+    Int32 version;
+    char  converterPath[2048];   // UTF-8, leer = automatisch suchen
+};
+static const Int32 kPwPrefsVersion = 1;
+
+static GS::UniString LoadSavedConverterPath ()
+{
+    Int32  version = 0;
+    GSSize nBytes  = 0;
+    if (ACAPI_GetPreferences (&version, &nBytes, nullptr) != NoError
+        || version != kPwPrefsVersion || nBytes != (GSSize)sizeof (PwPrefs))
+        return GS::UniString ();
+    PwPrefs prefs = {};
+    if (ACAPI_GetPreferences (&version, &nBytes, &prefs) != NoError)
+        return GS::UniString ();
+    prefs.converterPath[sizeof (prefs.converterPath) - 1] = '\0';
+    return GS::UniString (prefs.converterPath, CC_UTF8);
+}
+
+static void SaveConverterPath (const GS::UniString& path)
+{
+    PwPrefs prefs = {};
+    prefs.version = kPwPrefsVersion;
+    snprintf (prefs.converterPath, sizeof (prefs.converterPath), "%s",
+              path.ToCStr (0, MaxUSize, CC_UTF8).Get ());
+    ACAPI_SetPreferences (kPwPrefsVersion, sizeof (PwPrefs), &prefs);
+}
+
+static GS::UniString gConverterPath;   // in dieser Sitzung gefunden/gewaehlt
+
+// Prueft, ob der Converter auffindbar ist; fragt sonst den Benutzer.
+// false = abgebrochen, Import nicht starten.
+static bool EnsureLpXmlConverter ()
+{
+    if (ConverterExists (gConverterPath))
+        return true;
+
+    GS::UniString saved = LoadSavedConverterPath ();
+    if (ConverterExists (saved)) {
+        gConverterPath = saved;
+        return true;
+    }
+
+    gConverterPath = AutoFindConverter ();
+    if (!gConverterPath.IsEmpty ()) {
+        Log (GS::UniString (GS::UniString ("LP_XMLConverter: ") + gConverterPath).ToCStr ().Get ());
+        return true;
+    }
+
+    Log ("LP_XMLConverter nicht gefunden — frage Benutzer nach dem Archicad-Ordner.");
+#ifdef _WIN32
+    const GS::UniString hinweis ("Bitte den Programmordner dieser Archicad-Version waehlen "
+                                 "(enthaelt LP_XMLConverter.exe), z. B. C:\\Program Files\\GRAPHISOFT\\Archicad 26.");
+#else
+    const GS::UniString hinweis ("Bitte den Programmordner dieser Archicad-Version waehlen, "
+                                 "z. B. /Applications/GRAPHISOFT/Archicad 26.");
+#endif
+    short antwort = DGAlert (DG_WARNING,
+        GS::UniString ("LP_XMLConverter nicht gefunden"),
+        GS::UniString ("Ohne LP_XMLConverter kann das Punktwolken-Objekt nicht erzeugt werden."),
+        hinweis,
+        GS::UniString ("Ordner waehlen..."),
+        GS::UniString ("Abbrechen"));
+    if (antwort != 1)
+        return false;
+
+    while (true) {
+        DG::FileDialog dlg (DG::FileDialog::OpenFolder);
+        dlg.SetTitle (GS::UniString ("Archicad-Programmordner waehlen"));
+        if (!dlg.Invoke ())
+            return false;
+
+        GS::UniString folder;
+        dlg.GetSelectedFolder ().ToPath (&folder);
+        GS::UniString found = ConverterInFolder (folder);
+        if (!found.IsEmpty ()) {
+            gConverterPath = found;
+            SaveConverterPath (found);
+            Log (GS::UniString (GS::UniString ("LP_XMLConverter vom Benutzer gewaehlt: ") + found).ToCStr ().Get ());
+            return true;
+        }
+
+        antwort = DGAlert (DG_ERROR,
+            GS::UniString ("LP_XMLConverter nicht gefunden"),
+            GS::UniString ("Im gewaehlten Ordner liegt kein LP_XMLConverter:"),
+            folder,
+            GS::UniString ("Anderen Ordner..."),
+            GS::UniString ("Abbrechen"));
+        if (antwort != 1)
+            return false;
+    }
+}
 
 // --- PwMeta: Sidecar-Datei mit Import-Parametern (.pwmeta) -------------------
 // Beim ersten Import geschrieben, beim Reload gelesen.
@@ -358,6 +596,16 @@ static bool WriteGsmViaXml (
 {
     char guid[37];
     GetOrCreateGuid (outputDirPath, baseName, guid);
+
+    // Text IN der XML-Datei muss UTF-8 sein (so deklariert). Unter Windows liefern
+    // die Aufrufer ANSI — fuer Dateioperationen richtig, fuer das XML nicht.
+#ifdef _WIN32
+    const std::string baseNameXml = AnsiToUtf8 (baseName);
+    const std::string e57PathXml  = AnsiToUtf8 (e57PathStr ? e57PathStr : "");
+#else
+    const std::string baseNameXml = baseName;
+    const std::string e57PathXml  = e57PathStr ? e57PathStr : "";
+#endif
 
 #ifdef _WIN32
     char xmlTempDir[MAX_PATH] = "C:\\Temp";
@@ -523,11 +771,11 @@ static bool WriteGsmViaXml (
             if (!FileExists (pfad)) {
                 ++fehlend;
                 fprintf (f, "\t! Standort %d uebersprungen - %s_%s_%d.gspc fehlt\n",
-                         sc + 1, baseName, dirName, sc + 1);
+                         sc + 1, baseNameXml.c_str (), dirName, sc + 1);
                 continue;
             }
             fprintf (f, "\tif _sv[%d] then POINTCLOUD \"%s_%s_%d.gspc\"\n",
-                sc + 1, baseName, dirName, sc + 1);
+                sc + 1, baseNameXml.c_str (), dirName, sc + 1);
         }
         fprintf (f, "\n");
         if (fehlend > 0) {
@@ -739,7 +987,7 @@ static bool WriteGsmViaXml (
                "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%lld</Value></Integer>\n", (long long)totalPoints);
     fprintf (f, "\t\t<String Name=\"sE57Path\"><Description><![CDATA[\"E57 Quelldatei\"]]></Description>"
                "<Fix/><Flags><ParFlg_Hidden/></Flags>"
-               "<Value><![CDATA[\"%s\"]]></Value></String>\n", e57PathStr ? e57PathStr : "");
+               "<Value><![CDATA[\"%s\"]]></Value></String>\n", e57PathXml.c_str ());
     fprintf (f, "\t\t<Integer Name=\"iScanCount\"><Description><![CDATA[\"Anzahl Scan-Standorte\"]]></Description>"
                "<Fix/><Flags><ParFlg_Hidden/></Flags><Value>%d</Value></Integer>\n", scanCount);
     fprintf (f, "\t\t<Integer Name=\"gs_ui_current_page\"><Description><![CDATA[\"Aktive Seite\"]]></Description>"
@@ -810,9 +1058,16 @@ static bool WriteGsmViaXml (
     bool ok = false;
 
 #ifdef _WIN32
-    char cmdLine[4096];
-    snprintf (cmdLine, sizeof (cmdLine), "\"%s\" xml2libpart \"%s\" \"%s\"",
-              LP_XMLCONVERTER, xmlPath, gsmPath);
+    if (!ConverterExists (gConverterPath)) {
+        Log ("LP_XMLConverter nicht verfuegbar (EnsureLpXmlConverter vor dem Import nicht erfolgreich).");
+        return false;
+    }
+
+    // CreateProcessW darf die Kommandozeile veraendern, daher ein beschreibbarer Puffer
+    std::wstring cmd = L"\"" + ToWide (gConverterPath) + L"\" xml2libpart \""
+                     + AnsiToWide (xmlPath) + L"\" \"" + AnsiToWide (gsmPath) + L"\"";
+    std::vector<wchar_t> cmdLine (cmd.begin (), cmd.end ());
+    cmdLine.push_back (L'\0');
 
     SECURITY_ATTRIBUTES sa = {};
     sa.nLength = sizeof (sa);
@@ -822,7 +1077,7 @@ static bool WriteGsmViaXml (
         GENERIC_WRITE, FILE_SHARE_READ, &sa,
         CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 
-    STARTUPINFOA si = {};
+    STARTUPINFOW si = {};
     si.cb         = sizeof (si);
     si.dwFlags    = STARTF_USESTDHANDLES;
     si.hStdOutput = hOut;
@@ -830,7 +1085,7 @@ static bool WriteGsmViaXml (
     si.hStdInput  = GetStdHandle (STD_INPUT_HANDLE);
 
     PROCESS_INFORMATION pi = {};
-    if (CreateProcessA (nullptr, cmdLine, nullptr, nullptr, TRUE,
+    if (CreateProcessW (nullptr, cmdLine.data (), nullptr, nullptr, TRUE,
                         CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
     {
         WaitForSingleObject (pi.hProcess, INFINITE);
@@ -839,7 +1094,7 @@ static bool WriteGsmViaXml (
         ok = (exitCode == 0);
         CloseHandle (pi.hProcess);
         CloseHandle (pi.hThread);
-        char buf[256];
+        char buf[2048];
         snprintf (buf, sizeof (buf), "LP_XMLConverter exit=%lu xml=%s gsm=%s",
                   (unsigned long)exitCode, xmlPath, gsmPath);
         Log (buf);
@@ -858,10 +1113,17 @@ static bool WriteGsmViaXml (
                                       O_WRONLY | O_CREAT | O_TRUNC, 0644);
     posix_spawn_file_actions_adddup2 (&fa, STDOUT_FILENO, STDERR_FILENO);
 
-    const char* argv[] = { LP_XMLCONVERTER, "xml2libpart", xmlPath, gsmPath, nullptr };
+    const std::string converter = ToUtf8 (gConverterPath);
+    if (!ConverterExists (gConverterPath)) {
+        posix_spawn_file_actions_destroy (&fa);
+        Log ("LP_XMLConverter nicht verfuegbar (EnsureLpXmlConverter vor dem Import nicht erfolgreich).");
+        return false;
+    }
+
+    const char* argv[] = { converter.c_str (), "xml2libpart", xmlPath, gsmPath, nullptr };
     extern char** environ;
     pid_t pid;
-    int spawnRet = posix_spawn (&pid, LP_XMLCONVERTER, &fa, nullptr,
+    int spawnRet = posix_spawn (&pid, converter.c_str (), &fa, nullptr,
                                 (char* const*)argv, environ);
     posix_spawn_file_actions_destroy (&fa);
 
@@ -870,7 +1132,7 @@ static bool WriteGsmViaXml (
         waitpid (pid, &status, 0);
         int exitCode = WIFEXITED (status) ? WEXITSTATUS (status) : -1;
         ok = (exitCode == 0);
-        char buf[256];
+        char buf[2048];
         snprintf (buf, sizeof (buf), "LP_XMLConverter exit=%d xml=%s gsm=%s",
                   exitCode, xmlPath, gsmPath);
         Log (buf);
@@ -1397,6 +1659,10 @@ void AutoPlaceEntry (const PointCloudEntry& entry)
 GS::UniString DoImport (int densityPct, const GS::UniString* forceE57Path)
 {
     Log ("--- DoImport ---");
+
+    // Converter VOR dem (langen) E57-Lesen pruefen, ggf. Benutzer fragen
+    if (!EnsureLpXmlConverter ())
+        return GS::UniString ();
     const int STRIDE = std::max (1, 100 / densityPct);
 
     GS::UniString e57Path;
@@ -1709,7 +1975,9 @@ GS::UniString DoImport (int densityPct, const GS::UniString* forceE57Path)
 
         if (!ok) {
             Log ("WriteGsmViaXml fehlgeschlagen.");
-            ACAPI_WriteReport ("GSM konnte nicht erstellt werden.", true);
+            char msg[1200];
+            snprintf (msg, sizeof (msg), "GSM konnte nicht erstellt werden. Details im Log: %s", GetLogPath ());
+            ACAPI_WriteReport (msg, true);
             return GS::UniString ();
         }
     }
