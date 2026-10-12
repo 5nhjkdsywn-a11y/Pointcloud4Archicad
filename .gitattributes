@@ -1,0 +1,19 @@
+# Zeilenenden vereinheitlichen.
+# Hintergrund: Am 12.10.2026 kamen vier Quelldateien mit CRLF zurueck und
+# erzeugten einen Diff ueber 341 Zeilen ohne eine einzige inhaltliche Aenderung
+# (Bearbeitung auf einem anderen Rechner). Im Repository steht ab jetzt immer LF;
+# im Arbeitsverzeichnis darf jeder Editor machen, was er will.
+* text=auto eol=lf
+
+# Windows-Stapelverarbeitung braucht CRLF, sonst bricht cmd.exe ab
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# Binaerdateien unangetastet lassen
+*.png  binary
+*.jpg  binary
+*.tif  binary
+*.gsm  binary
+*.gspc binary
+*.e57  binary
+*.zip  binary
