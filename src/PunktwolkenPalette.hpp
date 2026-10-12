@@ -13,6 +13,7 @@
 #include "ACAPinc.h"
 #include "compat.h"
 #include "E57Importer.hpp"
+#include "ToolIcon.hpp"
 
 #include "DGDLLExport.h"
 #include "DGDialog.hpp"
@@ -90,6 +91,7 @@ private:
     virtual void ListViewHoverStarted    (const DG::ListViewHoverEvent& ev)                       override;
     virtual void ListViewHoverEnded      (const DG::ListViewHoverEvent& ev)                       override;
     void    SetToolEnabled (ToolItem item, bool enabled);
+    void    ResetToolHover ();
     virtual void PanelCloseRequested     (const DG::PanelCloseRequestEvent& ev, bool* accepted)      override;
 
     void    OnAdd ();

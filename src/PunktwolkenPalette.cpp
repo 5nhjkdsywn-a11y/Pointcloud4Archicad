@@ -13,19 +13,14 @@ static const GS::Guid paletteGuid ("{C7D4E5F6-1A2B-3C4D-8E9F-0A1B2C3D4E5F}");
 // Frueher wurden sie zur Laufzeit aus Archicads eigenem Ressourcenmodul geladen —
 // diese IDs gelten aber nur im Mac-Bundle, unter Windows blieb die Palette ohne Icons.
 enum PwIconId {
-    kIcoAdd       = 32401,   // (29531) Plus im Kreis (Vorgabe Torben)
-    kIcoSettings  = 32402,   // (12382) Einstellungen-Liste (Vorgabe Torben)
-    kIcoDelete    = 32403,   // (28346)
+    // 32401-32403 und 32409-32411 (Leiste, je normal und hover) sind KEINE
+    // Ressourcen mehr: die ListView zeichnet keine Ressourcen-Icons. Sie stecken
+    // als PNG-Daten im Programm, siehe ToolIcon.hpp.
     kIcoEyeOpen   = 32404,   // (10015)
     kIcoEyeClosed = 32405,   // (10016)
     kIcoStory     = 32406,   // (12750)
     kIcoScan      = 32407,   // (12411) Vermessungspunkt (grau) — Scanner-Standort
-    kIcoCloud     = 32408,   // ( 9900)
-
-    // Hover-Fassungen der Werkzeugleiste (erzeugt von tools/make-hover-svg.py)
-    kIcoAddHover      = 32409,
-    kIcoSettingsHover = 32410,
-    kIcoDeleteHover   = 32411
+    kIcoCloud     = 32408    // ( 9900)
 };
 
 GS::Ref<PunktwolkenPalette> PunktwolkenPalette::instance;
@@ -66,15 +61,13 @@ PunktwolkenPalette::PunktwolkenPalette () :
 
     // Icon-Leiste aufbauen
     {
-        const short ids[4]      = { 0, kIcoAdd,      kIcoSettings,      kIcoDelete };
-        const short hoverIds[4] = { 0, kIcoAddHover, kIcoSettingsHover, kIcoDeleteHover };
+        const ToolIcon::Id ids[4] = { ToolIcon::Add, ToolIcon::Add, ToolIcon::Settings, ToolIcon::Delete };
         toolbar.SetItemSize (32, 28);
         toolbar.SetImageSize (24, 24);
         for (int i = 1; i <= 3; ++i) {
-            // Beide Fassungen sind eigene Ressourcen (24x24, SVG) — nichts wird
-            // zur Laufzeit gemalt, also auf macOS und Windows gleich.
-            toolIcons[i]      = DG::Icon (ACAPI_GetOwnResModule (), ids[i]);
-            toolHoverIcons[i] = DG::Icon (ACAPI_GetOwnResModule (), hoverIds[i]);
+            // Aus eingebackenen PNG-Daten — Ressourcen-Icons zeichnet die ListView nicht
+            toolIcons[i]      = ToolIcon::Get (ids[i], false);
+            toolHoverIcons[i] = ToolIcon::Get (ids[i], true);
             toolbar.AppendItem ();
             toolbar.SetItemText ((short)i, GS::UniString ());
             toolbar.SetItemImage ((short)i, DG::ListView::Icon, toolIcons[i]);
@@ -188,7 +181,13 @@ void PunktwolkenPalette::RebuildTree ()
     nodes.clear ();
 
     int sel = SelectedCloud ();
-    if (sel < 0) { tree.EnableDraw (); return; }
+    if (sel < 0) {
+        // Ohne ausdrueckliches Neuzeichnen blieb unter Windows der alte Baum
+        // stehen, nachdem die letzte Punktwolke geloescht wurde.
+        tree.EnableDraw ();
+        tree.Redraw ();
+        return;
+    }
     const PointCloudEntry& e = entries[sel];
 
     stories = GetStoriesAscending ();
@@ -210,6 +209,7 @@ void PunktwolkenPalette::RebuildTree ()
         tree.SetItemText (hint, GS::UniString ("(nicht platziert)"));
         tree.ExpandItem (rootItem);
         tree.EnableDraw ();
+        tree.Redraw ();
         return;
     }
 
@@ -258,6 +258,7 @@ void PunktwolkenPalette::RebuildTree ()
     tree.ExpandItem (rootItem);
     tree.ExpandItem (folder);
     tree.EnableDraw ();
+    tree.Redraw ();
 }
 
 // --- Auge umschalten ---------------------------------------------------------
@@ -314,13 +315,18 @@ void PunktwolkenPalette::UpdateEyes ()
 
 void PunktwolkenPalette::PanelOpened (const DG::PanelOpenEvent& /*ev*/)
 {
-    for (short i = 1; i <= 3; ++i)      // Icons beim ersten Oeffnen sonst nicht sichtbar
-        toolbar.SetItemImage (i, DG::ListView::Icon, toolIcons[i]);
-    toolbar.Redraw ();
+    ResetToolHover ();      // Icons beim ersten Oeffnen sonst nicht sichtbar
     Refresh ();
 }
 
 // --- Icon-Leiste -------------------------------------------------------------
+
+void PunktwolkenPalette::ResetToolHover ()
+{
+    for (short i = 1; i <= 3; ++i)
+        toolbar.SetItemImage (i, DG::ListView::Icon, toolIcons[i]);
+    toolbar.Redraw ();
+}
 
 void PunktwolkenPalette::SetToolEnabled (ToolItem item, bool enabled)
 {
@@ -417,6 +423,7 @@ void PunktwolkenPalette::TreeViewItemClicked (const DG::TreeViewItemClickEvent& 
 
 void PunktwolkenPalette::OnAdd ()
 {
+    ResetToolHover ();   // modale Dialoge verschlucken ListViewHoverEnded
     if (importing) return;
     importing = true;
     defaultDensity = (int)densEdit.GetValue ();
@@ -439,6 +446,7 @@ void PunktwolkenPalette::OnAdd ()
 
 void PunktwolkenPalette::OnSettings ()
 {
+    ResetToolHover ();   // modale Dialoge verschlucken ListViewHoverEnded
     int sel = SelectedCloud ();
     if (sel < 0) return;
     if (!OpenSettingsDialog (entries[sel].libIndex))
@@ -448,6 +456,7 @@ void PunktwolkenPalette::OnSettings ()
 
 void PunktwolkenPalette::OnDelete ()
 {
+    ResetToolHover ();   // modale Dialoge verschlucken ListViewHoverEnded
     int sel = SelectedCloud ();
     if (sel < 0) return;
     if (TryDeleteEntry (entries[sel])) Refresh ();

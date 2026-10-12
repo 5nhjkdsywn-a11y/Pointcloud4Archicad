@@ -11,18 +11,6 @@
    weil Archicads Icon-IDs nur im Mac-Bundle gelten — unter Windows blieb die Palette leer.
    Herkunfts-IDs siehe PwIconId in PunktwolkenPalette.cpp. */
 
-'GICN' 32401 "Import" {
-	"PW_Add"
-}
-
-'GICN' 32402 "Einstellungen" {
-	"PW_Settings"
-}
-
-'GICN' 32403 "Loeschen" {
-	"PW_Delete"
-}
-
 'GICN' 32404 "Auge offen" {
 	"PW_EyeOpen"
 }
@@ -43,18 +31,7 @@
 	"PW_Cloud"
 }
 
-/* Hover-Fassungen der Werkzeugleiste: erzeugt von tools/make-hover-svg.py
-   aus den Basis-SVGs. Als echte Ressource, weil der graue Hintergrund frueher
-   zur Laufzeit gemalt wurde — unter Windows gibt es dafuer keinen Zeichenpfad,
-   dort kam ein leeres Icon heraus und die Leiste zeigte gefuellte Bloecke. */
-'GICN' 32409 "Import hover" {
-	"PW_AddHover"
-}
-
-'GICN' 32410 "Einstellungen hover" {
-	"PW_SettingsHover"
-}
-
-'GICN' 32411 "Loeschen hover" {
-	"PW_DeleteHover"
-}
+/* Die Icons der Werkzeugleiste stehen NICHT hier: die DG::ListView zeichnet
+   keine Ressourcen-Icons. Sie stecken als PNG-Daten im Programm
+   (src/ToolIconData.cpp, erzeugt von tools/make-icon-data.py aus den SVGs
+   in RFIX/Images). Die Baum-Icons unten sind davon nicht betroffen. */
