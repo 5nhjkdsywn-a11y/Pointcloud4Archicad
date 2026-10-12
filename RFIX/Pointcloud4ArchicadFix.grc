@@ -6,5 +6,39 @@
 	1905536138
 }
 
-/* Palette-Icons: alle aus ArchiCADs eigenen Ressourcen (RSGetApplicationResModule),
-   siehe ArchicadIconId in PunktwolkenPalette.cpp — keine eigenen GICN-Ressourcen. */
+/* Palette-Icons: einmalig aus Archicad 26 (macOS, Contents/Resources/<id>.tif) kopiert,
+   1x und @2x als PNG in RFIX/Images. Eigene Ressourcen statt RSGetApplicationResModule,
+   weil Archicads Icon-IDs nur im Mac-Bundle gelten — unter Windows blieb die Palette leer.
+   Herkunfts-IDs siehe PwIconId in PunktwolkenPalette.cpp. */
+
+'GICN' 32401 "Import" {
+	"PW_Add"
+}
+
+'GICN' 32402 "Einstellungen" {
+	"PW_Settings"
+}
+
+'GICN' 32403 "Loeschen" {
+	"PW_Delete"
+}
+
+'GICN' 32404 "Auge offen" {
+	"PW_EyeOpen"
+}
+
+'GICN' 32405 "Auge zu" {
+	"PW_EyeClosed"
+}
+
+'GICN' 32406 "Geschoss" {
+	"PW_Story"
+}
+
+'GICN' 32407 "Standort" {
+	"PW_Scan"
+}
+
+'GICN' 32408 "Punktwolke" {
+	"PW_Cloud"
+}

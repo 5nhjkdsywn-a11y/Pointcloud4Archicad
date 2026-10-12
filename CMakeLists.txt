@@ -181,7 +181,8 @@ set (AddOnSourcesFolder   "${CMAKE_CURRENT_LIST_DIR}/src")
 set (APIDevKitToolsDir    "${AC_API_DEVKIT_DIR}/Support/Tools")
 
 file (GLOB AddOnImageFiles
-	"${AddOnResourcesFolder}/RFIX/Images/*.svg")
+	"${AddOnResourcesFolder}/RFIX/Images/*.svg"
+	"${AddOnResourcesFolder}/RFIX/Images/*.png")
 
 if (WIN32)
 	file (GLOB AddOnResourceFiles

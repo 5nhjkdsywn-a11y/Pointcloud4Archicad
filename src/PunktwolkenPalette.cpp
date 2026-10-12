@@ -8,16 +8,19 @@
 
 static const GS::Guid paletteGuid ("{C7D4E5F6-1A2B-3C4D-8E9F-0A1B2C3D4E5F}");
 
-// Icon-IDs aus ArchiCADs eigenem Ressourcenmodul (Archicad 26.app/Contents/Resources/<id>.tif)
-enum ArchicadIconId {
-    kIcoEyeOpen   = 10015,
-    kIcoEyeClosed = 10016,
-    kIcoStory     = 12750,
-    kIcoScan      = 12411,   // Vermessungspunkt (grau) — Scanner-Standort
-    kIcoCloud     =  9900,
-    kIcoAdd       = 29531,   // Plus im Kreis (Vorgabe Torben)
-    kIcoSettings  = 12382,   // Einstellungen-Liste (Vorgabe Torben; 24837 zeigte zur Laufzeit ein anderes Bild)
-    kIcoDelete    = 28346
+// Icon-IDs = eigene GICN-Ressourcen (RFIX/Pointcloud4ArchicadFix.grc, Bilder in RFIX/Images).
+// Die Bilder sind einmalig aus Archicad 26 (macOS) kopiert; in Klammern die dortige ID.
+// Frueher wurden sie zur Laufzeit aus Archicads eigenem Ressourcenmodul geladen —
+// diese IDs gelten aber nur im Mac-Bundle, unter Windows blieb die Palette ohne Icons.
+enum PwIconId {
+    kIcoAdd       = 32401,   // (29531) Plus im Kreis (Vorgabe Torben)
+    kIcoSettings  = 32402,   // (12382) Einstellungen-Liste (Vorgabe Torben)
+    kIcoDelete    = 32403,   // (28346)
+    kIcoEyeOpen   = 32404,   // (10015)
+    kIcoEyeClosed = 32405,   // (10016)
+    kIcoStory     = 32406,   // (12750)
+    kIcoScan      = 32407,   // (12411) Vermessungspunkt (grau) — Scanner-Standort
+    kIcoCloud     = 32408    // ( 9900)
 };
 
 GS::Ref<PunktwolkenPalette> PunktwolkenPalette::instance;
@@ -48,11 +51,11 @@ PunktwolkenPalette::PunktwolkenPalette () :
     cloudPopUp   (GetReference (), kCloudPopUpId),
     tree         (GetReference (), kTreeId),
     versionLabel (GetReference (), kVersionLabelId),
-    iconEyeOpen   (RSGetApplicationResModule (), kIcoEyeOpen),
-    iconEyeClosed (RSGetApplicationResModule (), kIcoEyeClosed),
-    iconStory     (RSGetApplicationResModule (), kIcoStory),
-    iconScan      (RSGetApplicationResModule (), kIcoScan),
-    iconCloud     (RSGetApplicationResModule (), kIcoCloud)
+    iconEyeOpen   (ACAPI_GetOwnResModule (), kIcoEyeOpen),
+    iconEyeClosed (ACAPI_GetOwnResModule (), kIcoEyeClosed),
+    iconStory     (ACAPI_GetOwnResModule (), kIcoStory),
+    iconScan      (ACAPI_GetOwnResModule (), kIcoScan),
+    iconCloud     (ACAPI_GetOwnResModule (), kIcoCloud)
 {
     ACAPI_ProjectOperation_CatchProjectEvent (APINotify_Quit, NotificationHandler);
 
@@ -63,9 +66,9 @@ PunktwolkenPalette::PunktwolkenPalette () :
         toolbar.SetImageSize (24, 24);
         for (int i = 1; i <= 3; ++i) {
             // beide Varianten als 24x24-Bitmap, damit die ListView nichts skaliert
-            toolIcons[i]      = ToolIcon::Make (RSGetApplicationResModule (), ids[i], 24, 24, false);
-            toolHoverIcons[i] = ToolIcon::Make (RSGetApplicationResModule (), ids[i], 24, 24, true);
-            if (!toolIcons[i].IsValid ()) toolIcons[i] = DG::Icon (RSGetApplicationResModule (), ids[i]);
+            toolIcons[i]      = ToolIcon::Make (ACAPI_GetOwnResModule (), ids[i], 24, 24, false);
+            toolHoverIcons[i] = ToolIcon::Make (ACAPI_GetOwnResModule (), ids[i], 24, 24, true);
+            if (!toolIcons[i].IsValid ()) toolIcons[i] = DG::Icon (ACAPI_GetOwnResModule (), ids[i]);
             toolbar.AppendItem ();
             toolbar.SetItemText ((short)i, GS::UniString ());
             toolbar.SetItemImage ((short)i, DG::ListView::Icon, toolIcons[i]);

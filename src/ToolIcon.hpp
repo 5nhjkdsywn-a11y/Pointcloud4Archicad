@@ -16,7 +16,7 @@
 #include "DGUtility.hpp"
 
 namespace ToolIcon {
-    // resModule/resId: Icon-Quelle (z. B. RSGetApplicationResModule () + ArchiCAD-ID)
+    // resModule/resId: Icon-Quelle (z. B. ACAPI_GetOwnResModule () + eigene GICN-ID)
     DG::Icon Make (GSResModule resModule, short resId, short w, short h, bool withBackground);
 }
 
