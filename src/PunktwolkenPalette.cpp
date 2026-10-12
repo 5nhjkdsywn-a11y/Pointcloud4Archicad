@@ -20,7 +20,12 @@ enum PwIconId {
     kIcoEyeClosed = 32405,   // (10016)
     kIcoStory     = 32406,   // (12750)
     kIcoScan      = 32407,   // (12411) Vermessungspunkt (grau) — Scanner-Standort
-    kIcoCloud     = 32408    // ( 9900)
+    kIcoCloud     = 32408,   // ( 9900)
+
+    // Hover-Fassungen der Werkzeugleiste (erzeugt von tools/make-hover-svg.py)
+    kIcoAddHover      = 32409,
+    kIcoSettingsHover = 32410,
+    kIcoDeleteHover   = 32411
 };
 
 GS::Ref<PunktwolkenPalette> PunktwolkenPalette::instance;
@@ -61,14 +66,15 @@ PunktwolkenPalette::PunktwolkenPalette () :
 
     // Icon-Leiste aufbauen
     {
-        const short ids[4] = { 0, kIcoAdd, kIcoSettings, kIcoDelete };
+        const short ids[4]      = { 0, kIcoAdd,      kIcoSettings,      kIcoDelete };
+        const short hoverIds[4] = { 0, kIcoAddHover, kIcoSettingsHover, kIcoDeleteHover };
         toolbar.SetItemSize (32, 28);
         toolbar.SetImageSize (24, 24);
         for (int i = 1; i <= 3; ++i) {
-            // beide Varianten als 24x24-Bitmap, damit die ListView nichts skaliert
-            toolIcons[i]      = ToolIcon::Make (ACAPI_GetOwnResModule (), ids[i], 24, 24, false);
-            toolHoverIcons[i] = ToolIcon::Make (ACAPI_GetOwnResModule (), ids[i], 24, 24, true);
-            if (!toolIcons[i].IsValid ()) toolIcons[i] = DG::Icon (ACAPI_GetOwnResModule (), ids[i]);
+            // Beide Fassungen sind eigene Ressourcen (24x24, SVG) — nichts wird
+            // zur Laufzeit gemalt, also auf macOS und Windows gleich.
+            toolIcons[i]      = DG::Icon (ACAPI_GetOwnResModule (), ids[i]);
+            toolHoverIcons[i] = DG::Icon (ACAPI_GetOwnResModule (), hoverIds[i]);
             toolbar.AppendItem ();
             toolbar.SetItemText ((short)i, GS::UniString ());
             toolbar.SetItemImage ((short)i, DG::ListView::Icon, toolIcons[i]);

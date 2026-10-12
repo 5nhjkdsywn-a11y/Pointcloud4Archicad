@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;">
+    <g id="Ebene1" transform="matrix(1,0,0,1,-87,-20)">
+        <g transform="matrix(0.926849,0.00176167,-0.00161552,0.849958,86.6185,21.2067)">
+            <ellipse cx="13.381" cy="12.671" rx="10.025" ry="10.932" style="fill:none;stroke:rgb(41,127,255);stroke-width:1.8px;"/>
+        </g>
+        <g transform="matrix(6.12323e-17,1,-1,6.12323e-17,110.989,20.0518)">
+            <path d="M11.969,6.559L11.969,17.482" style="fill:none;stroke:rgb(41,127,255);stroke-width:1.6px;stroke-linecap:butt;"/>
+        </g>
+        <g transform="matrix(1,-1.13311e-15,1.13311e-15,1,87,20)">
+            <path d="M11.969,6.559L11.969,17.482" style="fill:none;stroke:rgb(41,127,255);stroke-width:1.6px;stroke-linecap:butt;"/>
+        </g>
+    </g>
+</svg>

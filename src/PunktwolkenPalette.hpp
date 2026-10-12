@@ -13,7 +13,6 @@
 #include "ACAPinc.h"
 #include "compat.h"
 #include "E57Importer.hpp"
-#include "ToolIcon.hpp"
 
 #include "DGDLLExport.h"
 #include "DGDialog.hpp"

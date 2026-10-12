@@ -42,3 +42,19 @@
 'GICN' 32408 "Punktwolke" {
 	"PW_Cloud"
 }
+
+/* Hover-Fassungen der Werkzeugleiste: erzeugt von tools/make-hover-svg.py
+   aus den Basis-SVGs. Als echte Ressource, weil der graue Hintergrund frueher
+   zur Laufzeit gemalt wurde — unter Windows gibt es dafuer keinen Zeichenpfad,
+   dort kam ein leeres Icon heraus und die Leiste zeigte gefuellte Bloecke. */
+'GICN' 32409 "Import hover" {
+	"PW_AddHover"
+}
+
+'GICN' 32410 "Einstellungen hover" {
+	"PW_SettingsHover"
+}
+
+'GICN' 32411 "Loeschen hover" {
+	"PW_DeleteHover"
+}

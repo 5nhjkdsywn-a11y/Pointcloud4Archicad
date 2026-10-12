@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Erzeugt von tools/make-hover-svg.py aus PW_Settings_24x24.svg - nicht von Hand aendern -->
+<svg width="24" height="24" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:serif="http://www.serif.com/">
+    <rect x="0" y="0" width="24" height="24" rx="4" ry="4" fill="#CDCDCD"/>
+<g id="Ebene2">
+        <g transform="matrix(0.9709,0,0,0.913299,0.644104,1.31911)">
+            <path d="M22.134,6.959L22.134,18.077C22.134,19.27 21.223,20.24 20.1,20.24L3.496,20.24C2.373,20.24 1.462,19.27 1.462,18.077L1.462,6.959C1.462,5.765 2.373,4.796 3.496,4.796L20.1,4.796C21.223,4.796 22.134,5.765 22.134,6.959Z" style="fill:none;stroke:rgb(41,127,255);stroke-width:1.7px;"/>
+        </g>
+        <g transform="matrix(0.9709,0,0,1.00092,0.644104,-0.454352)">
+            <path d="M22.134,6.959L22.134,18.077C22.134,19.27 21.135,20.24 19.905,20.24L3.691,20.24C2.461,20.24 1.462,19.27 1.462,18.077L1.462,6.959C1.462,5.765 2.461,4.796 3.691,4.796L19.905,4.796C21.135,4.796 22.134,5.765 22.134,6.959Z" style="fill:none;stroke:rgb(41,127,255);stroke-width:1.62px;"/>
+        </g>
+        <g transform="matrix(1.06573,0,0,1,-0.936183,0)">
+            <path d="M10.714,10.473L17.987,10.473" style="fill:none;stroke:rgb(41,127,255);stroke-width:1.55px;"/>
+        </g>
+        <g transform="matrix(1.21156,0,0,1,-1.39287,0)">
+            <path d="M5.924,10.473L7.228,10.473" style="fill:none;stroke:rgb(41,127,255);stroke-width:1.44px;"/>
+        </g>
+        <g transform="matrix(1.06573,0,0,1,-0.936183,4.68795)">
+            <path d="M10.714,10.473L17.987,10.473" style="fill:none;stroke:rgb(41,127,255);stroke-width:1.55px;"/>
+        </g>
+        <g transform="matrix(1.21156,0,0,1,-1.39287,4.68795)">
+            <path d="M5.924,10.473L7.228,10.473" style="fill:none;stroke:rgb(41,127,255);stroke-width:1.44px;"/>
+        </g>
+    </g>
+</svg>
