@@ -8,6 +8,8 @@
 	<string>com.torben.Pointcloud4Archicad</string>
 	<key>CFBundleName</key>
 	<string>Pointcloud4Archicad</string>
+	<key>CFBundleExecutable</key>
+	<string>@AC_ADDON_NAME@</string>
 	<key>CFBundleGetInfoString</key>
 	<string>Pointcloud4Archicad @PW_VERSION@</string>
 	<key>CFBundleShortVersionString</key>
