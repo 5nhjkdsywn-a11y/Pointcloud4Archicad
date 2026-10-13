@@ -9,6 +9,10 @@ documentation.*
 
 ## Was es tut
 
+Kurzvorführung: Import einer E57, Palette, Ein- und Ausblenden, Grundriss-Ausschnitt.
+
+https://github.com/user-attachments/assets/6d311b69-1bc0-4ba3-8a88-5bb5127d05a6
+
 - **Import** einer `.e57`-Datei mit wählbarer Punktdichte (1–100 %, Feld oben
   links, dann ➕). Pro Scan-Standort entsteht eine eigene `.gspc`-Datei
   (Archicads natives Punktwolkenformat), dazu ein GDL-Objekt (`.gsm`), das
