@@ -32,7 +32,6 @@ https://github.com/user-attachments/assets/6d311b69-1bc0-4ba3-8a88-5bb5127d05a6
   im 3D-Fenster.
 
 Bedienung über eine dockbare Palette: **Planung → Punktwolken-Palette…**
-Alle Icons stammen aus Archicads eigenen Ressourcen.
 
 ## Dateien, die der Import erzeugt
 
