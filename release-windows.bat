@@ -15,9 +15,10 @@ rem  NICHT als Administrator ausfuehren - das Verteilen nach
 rem  "C:\Program Files\GRAPHISOFT\..." macht weiterhin deploy_windows.bat.
 rem
 rem  Voraussetzungen (siehe memory\project_windows_build.md):
-rem    - CMake und Python im PATH
-rem    - Visual Studio 2022 mit Toolset v142 (AC26-28) und v143 (AC29)
-rem    - vcpkg mit xerces-c:x64-windows-static-md
+rem    - Python im PATH
+rem    - Build Tools fuer Visual Studio 2026 mit Toolset v142 (AC26-28)
+rem      und v143 (AC29); deren CMake wird genommen, wenn keins im PATH ist
+rem    - vcpkg mit xerces-c:x64-windows-static-md (mit v142 gebaut)
 rem ===========================================================================
 
 setlocal enabledelayedexpansion
@@ -37,12 +38,16 @@ for %%a in (%*) do (
 )
 if not "!ARGVERS!"=="" set VERSIONEN=!ARGVERS!
 
-rem --- CMake vorhanden? ------------------------------------------------------
+rem --- CMake vorhanden? Sonst das aus den Build Tools --------------------------
+set VSCMAKE=C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin
 where cmake >nul 2>&1
 if errorlevel 1 (
-    echo FEHLER: cmake nicht im PATH.
-    echo         z.B.  set PATH=%%PATH%%;C:\Program Files\CMake\bin
-    exit /b 2
+    if exist "%VSCMAKE%\cmake.exe" (
+        set "PATH=%PATH%;%VSCMAKE%"
+    ) else (
+        echo FEHLER: cmake weder im PATH noch in den Build Tools 2026.
+        exit /b 2
+    )
 )
 
 rem --- Version aus CMakeLists.txt lesen --------------------------------------

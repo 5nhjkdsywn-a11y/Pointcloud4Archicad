@@ -103,8 +103,10 @@ AppLocker-Richtlinien relevant).
     (Pfad `XercesC_ROOT` in den Presets anpassen)
 - macOS: Xcode; DevKit nach dem Download einmalig entquarantänen:
   `xattr -cr <DevKit-Ordner>`
-- Windows: Visual Studio 2022 mit Toolset **v142** für AC26–28 und **v143** für AC29
-  (die DevKit-Header erzwingen das).
+- Windows: Build Tools für Visual Studio 2026 mit Toolset **v142** für AC26–28 und
+  **v143** für AC29 (die DevKit-Header erzwingen das). Für v143 die Einzelkomponente
+  `Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64` installieren — die
+  Komponentengruppe bringt nur den Compiler, nicht die MSBuild-Einbindung.
 
 ### Build
 

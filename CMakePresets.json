@@ -84,112 +84,112 @@
     {
       "name": "ac26-win-debug",
       "displayName": "ArchiCAD 26 · Windows · Debug",
-      "generator": "Visual Studio 17 2022",
+      "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "toolset": "v142",
       "binaryDir": "${sourceDir}/build/win-ac26",
       "cacheVariables": {
         "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/windows/API.Development.Kit.WIN.26.7000",
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools",
         "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
       }
     },
     {
       "name": "ac26-win-release",
       "displayName": "ArchiCAD 26 · Windows · Release",
-      "generator": "Visual Studio 17 2022",
+      "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "toolset": "v142",
       "binaryDir": "${sourceDir}/build/win-ac26",
       "cacheVariables": {
         "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/windows/API.Development.Kit.WIN.26.7000",
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools",
         "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
       }
     },
     {
       "name": "ac27-win-debug",
       "displayName": "ArchiCAD 27 · Windows · Debug",
-      "generator": "Visual Studio 17 2022",
+      "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "toolset": "v142",
       "binaryDir": "${sourceDir}/build/win-ac27",
       "cacheVariables": {
         "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/windows/API.Development.Kit.WIN.27.6003",
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools",
         "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
       }
     },
     {
       "name": "ac27-win-release",
       "displayName": "ArchiCAD 27 · Windows · Release",
-      "generator": "Visual Studio 17 2022",
+      "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "toolset": "v142",
       "binaryDir": "${sourceDir}/build/win-ac27",
       "cacheVariables": {
         "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/windows/API.Development.Kit.WIN.27.6003",
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools",
         "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
       }
     },
     {
       "name": "ac28-win-debug",
       "displayName": "ArchiCAD 28 · Windows · Debug",
-      "generator": "Visual Studio 17 2022",
+      "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "toolset": "v142",
       "binaryDir": "${sourceDir}/build/win-ac28",
       "cacheVariables": {
         "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/windows/API.Development.Kit.WIN.28.4001",
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools",
         "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
       }
     },
     {
       "name": "ac28-win-release",
       "displayName": "ArchiCAD 28 · Windows · Release",
-      "generator": "Visual Studio 17 2022",
+      "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "toolset": "v142",
       "binaryDir": "${sourceDir}/build/win-ac28",
       "cacheVariables": {
         "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/windows/API.Development.Kit.WIN.28.4001",
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools",
         "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
       }
     },
     {
       "name": "ac29-win-debug",
       "displayName": "ArchiCAD 29 · Windows · Debug",
-      "generator": "Visual Studio 17 2022",
+      "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "toolset": "v143",
       "binaryDir": "${sourceDir}/build/win-ac29",
       "cacheVariables": {
         "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/windows/API.Development.Kit.WIN.29.3100",
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools",
         "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
       }
     },
     {
       "name": "ac29-win-release",
       "displayName": "ArchiCAD 29 · Windows · Release",
-      "generator": "Visual Studio 17 2022",
+      "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "toolset": "v143",
       "binaryDir": "${sourceDir}/build/win-ac29",
       "cacheVariables": {
         "AC_API_DEVKIT_DIR": "${sourceDir}/../../api/archicad/windows/API.Development.Kit.WIN.29.3100",
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files/Microsoft Visual Studio/2022/Community",
+        "CMAKE_GENERATOR_INSTANCE": "C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools",
         "XercesC_ROOT": "C:/vcpkg/installed/x64-windows-static-md"
       }
     }
